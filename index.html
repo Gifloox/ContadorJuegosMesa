@@ -575,6 +575,7 @@
         { key: "generala", label: "Generala", hint: "ej: 50" },
         { key: "generalaDoble", label: "Generala Doble", hint: "ej: 100" },
       ];
+
       /* ---------- Configuración de Firebase ---------- */
       const firebaseConfig = {
         apiKey: "AIzaSyAcj-EIGLk9nRgcz3KtK4BsCbuwzaGOjI0",
@@ -621,6 +622,13 @@
           console.error("Error cargando sala desde Firebase", e);
           return null;
         }
+      }
+
+      function syncUrl() {
+        try {
+          if (state.code) history.replaceState(null, "", "?room=" + state.code);
+          else history.replaceState(null, "", location.pathname);
+        } catch (e) {}
       }
 
       /* ---------- Navegación ---------- */
