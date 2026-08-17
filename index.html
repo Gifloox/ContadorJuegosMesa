@@ -1,0 +1,1190 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mesa de Juego · Burako & Generala</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500..800&family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600;700&display=swap");
+
+      :root {
+        --felt-dark: #0f2e22;
+        --felt: #164a34;
+        --felt-light: #1f5c40;
+        --parchment: #faf4e6;
+        --parchment-dim: #f0e6d0;
+        --card-border: #ddc98f;
+        --ink: #20241c;
+        --ink-soft: #5a5a4d;
+        --gold: #c89b3c;
+        --gold-dark: #9c7728;
+        --red: #a1352f;
+        --green-ok: #2d6a4f;
+        --radius: 18px;
+        --shadow: 0 20px 50px -15px rgba(0, 0, 0, 0.55);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        min-height: 100vh;
+        font-family: "Inter", sans-serif;
+        color: var(--ink);
+        background: radial-gradient(
+          ellipse at 50% -10%,
+          var(--felt-light) 0%,
+          var(--felt) 45%,
+          var(--felt-dark) 100%
+        );
+        background-attachment: fixed;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding: 32px 16px 60px;
+        position: relative;
+        overflow-x: hidden;
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background-image:
+          radial-gradient(
+            circle at 20% 20%,
+            rgba(255, 255, 255, 0.04) 0,
+            transparent 40%
+          ),
+          radial-gradient(
+            circle at 80% 70%,
+            rgba(255, 255, 255, 0.03) 0,
+            transparent 45%
+          );
+        pointer-events: none;
+      }
+
+      #app {
+        width: 100%;
+        max-width: 560px;
+        animation: fadeIn 0.4s ease;
+        position: relative;
+        z-index: 1;
+      }
+      #app.wide-mode {
+        max-width: 900px;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .card {
+        background: var(--parchment);
+        border: 1px solid var(--card-border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        padding: 32px 28px 28px;
+        position: relative;
+      }
+      .card.wide {
+        padding: 28px 20px;
+      }
+
+      .card::before {
+        content: "";
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        right: 10px;
+        bottom: 10px;
+        border: 1px dashed rgba(200, 155, 60, 0.35);
+        border-radius: calc(var(--radius) - 6px);
+        pointer-events: none;
+      }
+
+      h1,
+      h2,
+      h3 {
+        font-family: "Fraunces", serif;
+        color: var(--ink);
+        margin: 0 0 6px;
+        letter-spacing: -0.01em;
+      }
+      h1 {
+        font-size: 2rem;
+        font-weight: 700;
+        text-align: center;
+      }
+      h2 {
+        font-size: 1.5rem;
+        font-weight: 700;
+      }
+      h3 {
+        font-size: 1.05rem;
+        font-weight: 600;
+        color: var(--ink-soft);
+        margin-top: 22px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-family: "Inter", sans-serif;
+      }
+
+      .subtitle {
+        text-align: center;
+        color: var(--ink-soft);
+        margin: 0 0 26px;
+        font-size: 0.95rem;
+      }
+
+      .btn {
+        display: block;
+        width: 100%;
+        border: none;
+        border-radius: 12px;
+        padding: 14px 18px;
+        font-family: "Inter", sans-serif;
+        font-weight: 600;
+        font-size: 1rem;
+        cursor: pointer;
+        transition:
+          transform 0.12s ease,
+          box-shadow 0.12s ease,
+          opacity 0.12s ease;
+      }
+      .btn:active {
+        transform: scale(0.98);
+      }
+      .btn-primary {
+        background: linear-gradient(
+          180deg,
+          var(--gold) 0%,
+          var(--gold-dark) 100%
+        );
+        color: #2a1f08;
+        margin-top: 18px;
+        box-shadow: 0 8px 18px -8px rgba(200, 155, 60, 0.6);
+      }
+      .btn-primary:hover {
+        box-shadow: 0 10px 22px -6px rgba(200, 155, 60, 0.75);
+      }
+      .btn-secondary {
+        background: var(--felt);
+        color: var(--parchment);
+      }
+      .btn-link {
+        display: block;
+        width: 100%;
+        text-align: center;
+        background: none;
+        border: none;
+        color: var(--ink-soft);
+        font-size: 0.9rem;
+        margin-top: 18px;
+        cursor: pointer;
+        text-decoration: underline;
+      }
+
+      .divider {
+        text-align: center;
+        color: var(--ink-soft);
+        font-size: 0.85rem;
+        margin: 20px 0;
+        position: relative;
+      }
+      .divider::before,
+      .divider::after {
+        content: "";
+        position: absolute;
+        top: 50%;
+        width: 38%;
+        height: 1px;
+        background: var(--card-border);
+      }
+      .divider::before {
+        left: 0;
+      }
+      .divider::after {
+        right: 0;
+      }
+
+      .join-row {
+        display: flex;
+        gap: 8px;
+      }
+      .join-row input {
+        flex: 1;
+        min-width: 0;
+      }
+
+      input[type="text"],
+      input[type="number"],
+      input.name-input {
+        width: 100%;
+        padding: 12px 14px;
+        border-radius: 10px;
+        border: 1.5px solid var(--card-border);
+        background: #fff;
+        font-family: "Inter", sans-serif;
+        font-size: 1rem;
+        color: var(--ink);
+        margin-bottom: 10px;
+      }
+      input:focus {
+        outline: 2px solid var(--gold);
+        outline-offset: 1px;
+        border-color: var(--gold);
+      }
+
+      label {
+        display: block;
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--ink-soft);
+        margin: 16px 0 8px;
+      }
+
+      .error {
+        color: var(--red);
+        font-size: 0.85rem;
+        margin-top: 8px;
+        min-height: 1em;
+      }
+
+      .room-code-badge {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        background: var(--felt-dark);
+        color: var(--parchment);
+        font-family: "Space Mono", monospace;
+        font-size: 0.85rem;
+        padding: 8px 14px;
+        border-radius: 999px;
+        width: fit-content;
+        margin: 0 auto 20px;
+        letter-spacing: 0.08em;
+      }
+      .room-code-badge b {
+        color: var(--gold);
+        font-size: 1rem;
+      }
+      .copy-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 1rem;
+        color: inherit;
+        padding: 0 2px;
+      }
+
+      .game-options {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-top: 18px;
+      }
+      .game-btn {
+        padding: 20px;
+        border-radius: 14px;
+        border: 1.5px solid var(--card-border);
+        background: #fff;
+        font-family: "Fraunces", serif;
+        font-size: 1.15rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition:
+          border-color 0.15s ease,
+          transform 0.12s ease;
+      }
+      .game-btn:hover {
+        border-color: var(--gold);
+        transform: translateY(-2px);
+      }
+
+      .mode-options {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .mode-btn {
+        padding: 12px 16px;
+        border-radius: 10px;
+        border: 1.5px solid var(--card-border);
+        background: #fff;
+        font-family: "Inter", sans-serif;
+        font-weight: 600;
+        cursor: pointer;
+        text-align: left;
+      }
+      .mode-btn.active {
+        border-color: var(--gold);
+        background: #fff8e8;
+        box-shadow: 0 0 0 1px var(--gold);
+      }
+
+      .names-section {
+        margin-top: 12px;
+      }
+
+      .count-stepper {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+        margin: 10px 0 6px;
+      }
+      .btn-round {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        border: 1.5px solid var(--card-border);
+        background: #fff;
+        font-size: 1.3rem;
+        cursor: pointer;
+        line-height: 1;
+      }
+      .count-display {
+        font-family: "Space Mono", monospace;
+        font-size: 1.6rem;
+        font-weight: 700;
+        min-width: 2ch;
+        text-align: center;
+      }
+
+      .totals-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 10px;
+        margin-top: 16px;
+      }
+      .total-card {
+        background: var(--felt-dark);
+        color: var(--parchment);
+        border-radius: 12px;
+        padding: 14px 10px;
+        text-align: center;
+      }
+      .total-card.winner {
+        background: linear-gradient(
+          180deg,
+          var(--gold) 0%,
+          var(--gold-dark) 100%
+        );
+        color: #2a1f08;
+      }
+      .entity-name {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        opacity: 0.85;
+        margin-bottom: 4px;
+      }
+      .entity-total {
+        font-family: "Space Mono", monospace;
+        font-size: 1.5rem;
+        font-weight: 700;
+      }
+
+      .limit-info {
+        text-align: center;
+        color: var(--ink-soft);
+        font-size: 0.85rem;
+        margin-top: -4px;
+      }
+
+      .winner-banner {
+        background: linear-gradient(
+          180deg,
+          var(--gold) 0%,
+          var(--gold-dark) 100%
+        );
+        color: #2a1f08;
+        text-align: center;
+        font-family: "Fraunces", serif;
+        font-weight: 700;
+        font-size: 1.1rem;
+        padding: 12px;
+        border-radius: 12px;
+        margin: 14px 0;
+      }
+
+      .add-hand-section {
+        margin-top: 8px;
+      }
+      .hand-input-group {
+        display: grid;
+        grid-template-columns: 1fr 90px 90px;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 6px;
+      }
+      .hand-input-group label {
+        margin: 0;
+        text-transform: none;
+        font-weight: 600;
+        color: var(--ink);
+        font-size: 0.9rem;
+        letter-spacing: 0;
+      }
+      .hand-input-group input {
+        margin-bottom: 0;
+        padding: 10px;
+        font-family: "Space Mono", monospace;
+        text-align: center;
+      }
+
+      .table-scroll {
+        overflow-x: auto;
+        margin-top: 6px;
+        -webkit-overflow-scrolling: touch;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        min-width: 420px;
+        font-size: 0.88rem;
+      }
+      table th,
+      table td {
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--card-border);
+        text-align: center;
+        white-space: nowrap;
+      }
+      table th {
+        font-family: "Inter", sans-serif;
+        font-weight: 600;
+        color: var(--ink-soft);
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        border-bottom: 2px solid var(--gold);
+      }
+      table td:first-child,
+      table th:first-child {
+        text-align: left;
+        font-weight: 600;
+        position: sticky;
+        left: 0;
+        background: var(--parchment);
+      }
+      table.scorecard td:first-child {
+        min-width: 130px;
+      }
+      .muted {
+        color: var(--ink-soft);
+        font-size: 0.78rem;
+      }
+
+      table td .cell-input {
+        width: 56px;
+        padding: 6px 4px;
+        margin: 0;
+        text-align: center;
+        font-family: "Space Mono", monospace;
+      }
+      .cell-points {
+        display: block;
+        font-size: 0.7rem;
+        color: var(--green-ok);
+        font-family: "Space Mono", monospace;
+      }
+
+      .total-row td {
+        font-family: "Space Mono", monospace;
+        font-weight: 700;
+        font-size: 1rem;
+        border-top: 2px solid var(--gold);
+        border-bottom: none;
+        background: #fff8e8;
+      }
+      .total-row td:first-child {
+        background: #fff8e8;
+      }
+
+      .share-row {
+        display: flex;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      .share-row .btn {
+        margin-top: 0;
+        font-size: 0.85rem;
+        padding: 10px;
+      }
+
+      ::selection {
+        background: var(--gold);
+        color: #2a1f08;
+      }
+
+      @media (max-width: 480px) {
+        .card {
+          padding: 24px 18px 22px;
+        }
+        h1 {
+          font-size: 1.6rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <script>
+      /* ---------- Estado ---------- */
+      let state = {
+        code: null,
+        room: null,
+        screen: "home",
+        pollTimer: null,
+      };
+
+      const app = document.getElementById("app");
+
+      const NUMBER_CATS = [
+        { key: "uno", label: "1 · Ases", n: 1 },
+        { key: "dos", label: "2 · Doses", n: 2 },
+        { key: "tres", label: "3 · Treses", n: 3 },
+        { key: "cuatro", label: "4 · Cuatros", n: 4 },
+        { key: "cinco", label: "5 · Cincos", n: 5 },
+        { key: "seis", label: "6 · Seises", n: 6 },
+      ];
+      const POINT_CATS = [
+        { key: "escalera", label: "Escalera", hint: "ej: 20" },
+        { key: "full", label: "Full", hint: "ej: 30" },
+        { key: "poker", label: "Póker", hint: "ej: 40" },
+        { key: "generala", label: "Generala", hint: "ej: 50" },
+        { key: "generalaDoble", label: "Generala Doble", hint: "ej: 100" },
+      ];
+
+      /* ---------- Storage helpers ---------- */
+      function genCode() {
+        const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        let s = "";
+        for (let i = 0; i < 5; i++)
+          s += chars[Math.floor(Math.random() * chars.length)];
+        return s;
+      }
+
+      async function saveRoom() {
+        if (!state.code || !state.room) return;
+        try {
+          await window.storage.set(
+            "room-" + state.code,
+            JSON.stringify(state.room),
+            true,
+          );
+        } catch (e) {
+          console.error("Error guardando sala", e);
+        }
+      }
+
+      async function loadRoom(code) {
+        try {
+          const res = await window.storage.get("room-" + code, true);
+          if (res && res.value) return JSON.parse(res.value);
+          return null;
+        } catch (e) {
+          return null;
+        }
+      }
+
+      function syncUrl() {
+        try {
+          if (state.code) history.replaceState(null, "", "?room=" + state.code);
+          else history.replaceState(null, "", location.pathname);
+        } catch (e) {}
+      }
+
+      /* ---------- Navegación ---------- */
+      function routeToScreen() {
+        const r = state.room;
+        if (!r || !r.game) {
+          state.screen = "choose-game";
+          return;
+        }
+        if (r.game === "burako") {
+          state.screen = r.status === "setup" ? "burako-setup" : "burako-play";
+        } else {
+          state.screen =
+            r.status === "setup" ? "generala-setup" : "generala-play";
+        }
+      }
+
+      function goHome() {
+        stopPolling();
+        state = { code: null, room: null, screen: "home", pollTimer: null };
+        syncUrl();
+        render();
+      }
+
+      function startPolling() {
+        stopPolling();
+        state.pollTimer = setInterval(async () => {
+          if (!state.code) return;
+          const active = document.activeElement;
+          if (active && active.tagName === "INPUT") return;
+          const fresh = await loadRoom(state.code);
+          if (fresh) {
+            state.room = fresh;
+            routeToScreen();
+            render();
+          }
+        }, 4000);
+      }
+      function stopPolling() {
+        if (state.pollTimer) {
+          clearInterval(state.pollTimer);
+          state.pollTimer = null;
+        }
+      }
+
+      function copyCode() {
+        const text = state.code;
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(text).catch(() => {});
+        }
+      }
+      function copyLink() {
+        const url = location.origin + location.pathname + "?room=" + state.code;
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(url).catch(() => {});
+        }
+      }
+
+      /* ---------- HOME ---------- */
+      function renderHome() {
+        app.classList.remove("wide-mode");
+        app.innerHTML = `
+    <div class="card">
+      <h1>🎲 Mesa de Juego</h1>
+      <p class="subtitle">Anotador compartido para Burako y Generala</p>
+      <button class="btn btn-primary" onclick="startCreate()">➕ Crear nueva sala</button>
+      <div class="divider">o</div>
+      <label style="margin-top:0">Unirse con código de sala</label>
+      <div class="join-row">
+        <input type="text" id="join-code" maxlength="5" placeholder="CÓDIGO" style="text-transform:uppercase" />
+        <button class="btn btn-secondary" style="width:auto; padding:0 18px;" onclick="startJoin()">Unirse</button>
+      </div>
+      <div id="home-error" class="error"></div>
+    </div>`;
+        const input = document.getElementById("join-code");
+        input.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") startJoin();
+        });
+        input.addEventListener("input", (e) => {
+          e.target.value = e.target.value.toUpperCase();
+        });
+      }
+
+      async function startCreate() {
+        state.code = genCode();
+        state.room = { game: null, status: "setup" };
+        await saveRoom();
+        syncUrl();
+        state.screen = "choose-game";
+        startPolling();
+        render();
+      }
+
+      async function startJoin() {
+        const codeInput = document.getElementById("join-code");
+        const code = codeInput.value.trim().toUpperCase();
+        const errEl = document.getElementById("home-error");
+        if (!code) {
+          errEl.textContent = "Ingresá un código de sala.";
+          return;
+        }
+        errEl.textContent = "Buscando sala...";
+        const room = await loadRoom(code);
+        if (!room) {
+          errEl.textContent = "Sala no encontrada. Verificá el código.";
+          return;
+        }
+        state.code = code;
+        state.room = room;
+        syncUrl();
+        routeToScreen();
+        startPolling();
+        render();
+      }
+
+      /* ---------- ELEGIR JUEGO ---------- */
+      function renderChooseGame() {
+        app.classList.remove("wide-mode");
+        app.innerHTML = `
+    <div class="card">
+      <div class="room-code-badge">Sala <b>${state.code}</b> <button class="copy-btn" onclick="copyCode()" title="Copiar código">📋</button></div>
+      <h2 style="text-align:center">¿Qué van a jugar?</h2>
+      <div class="game-options">
+        <button class="game-btn" onclick="chooseGame('burako')">🃏 Burako</button>
+        <button class="game-btn" onclick="chooseGame('generala')">🎲 Generala</button>
+      </div>
+      <button class="btn-link" onclick="goHome()">‹ Salir de la sala</button>
+    </div>`;
+      }
+
+      async function chooseGame(game) {
+        state.room.game = game;
+        if (game === "burako") {
+          state.room.burako = {
+            mode: null,
+            entities: [],
+            limit: 3000,
+            rounds: [],
+          };
+        } else {
+          state.room.generala = { entities: [], scores: {} };
+        }
+        await saveRoom();
+        state.screen = game + "-setup";
+        render();
+      }
+
+      /* ---------- BURAKO: SETUP ---------- */
+      function renderBurakoSetup() {
+        app.classList.remove("wide-mode");
+        const b = state.room.burako;
+        let namesHtml = "";
+        if (b.mode === 2 || b.mode === 3) {
+          namesHtml = Array.from({ length: b.mode })
+            .map(
+              (_, i) => `
+      <input class="name-input" id="bname-${i}" placeholder="Nombre jugador ${i + 1}" value="${(b.entities[i] && b.entities[i].name) || ""}" />
+    `,
+            )
+            .join("");
+        } else if (b.mode === 4) {
+          namesHtml = `
+      <input class="name-input" id="bname-0" placeholder="Nombre equipo N" value="${(b.entities[0] && b.entities[0].name) || "Nosotros"}" />
+      <input class="name-input" id="bname-1" placeholder="Nombre equipo E" value="${(b.entities[1] && b.entities[1].name) || "Ellos"}" />
+    `;
+        }
+        app.innerHTML = `
+    <div class="card">
+      <div class="room-code-badge">Sala <b>${state.code}</b> <button class="copy-btn" onclick="copyCode()">📋</button></div>
+      <h2>🃏 Configurar Burako</h2>
+      <label style="margin-top:6px">¿Cuántos juegan?</label>
+      <div class="mode-options">
+        <button class="mode-btn ${b.mode === 2 ? "active" : ""}" onclick="setBurakoMode(2)">2 jugadores</button>
+        <button class="mode-btn ${b.mode === 3 ? "active" : ""}" onclick="setBurakoMode(3)">3 jugadores</button>
+        <button class="mode-btn ${b.mode === 4 ? "active" : ""}" onclick="setBurakoMode(4)">4 jugadores · 2 equipos (N y E)</button>
+      </div>
+      ${
+        b.mode
+          ? `
+        <div class="names-section">
+          <label>Nombres</label>
+          ${namesHtml}
+        </div>
+        <label>Puntaje límite para ganar</label>
+        <input type="number" id="blimit" value="${b.limit || 3000}" />
+        <button class="btn btn-primary" onclick="startBurakoGame()">Comenzar partida</button>
+      `
+          : ""
+      }
+      <button class="btn-link" onclick="goHome()">‹ Salir de la sala</button>
+    </div>`;
+      }
+
+      async function setBurakoMode(mode) {
+        const b = state.room.burako;
+        b.mode = mode;
+        if (mode === 4) {
+          b.entities = [
+            { id: "N", name: "Nosotros" },
+            { id: "E", name: "Ellos" },
+          ];
+        } else {
+          b.entities = Array.from({ length: mode }).map((_, i) => ({
+            id: "p" + i,
+            name: "",
+          }));
+        }
+        await saveRoom();
+        render();
+      }
+
+      async function startBurakoGame() {
+        const b = state.room.burako;
+        b.entities.forEach((e, i) => {
+          const el = document.getElementById("bname-" + i);
+          const val = el ? el.value.trim() : "";
+          e.name =
+            val ||
+            (b.mode === 4
+              ? i === 0
+                ? "Nosotros"
+                : "Ellos"
+              : "Jugador " + (i + 1));
+        });
+        const limitVal = parseInt(document.getElementById("blimit").value);
+        b.limit = isNaN(limitVal) ? 3000 : limitVal;
+        b.rounds = [];
+        state.room.status = "playing";
+        await saveRoom();
+        state.screen = "burako-play";
+        render();
+      }
+
+      /* ---------- BURAKO: JUGAR ---------- */
+      function computeBurakoTotals() {
+        const b = state.room.burako;
+        const totals = {};
+        b.entities.forEach((e) => (totals[e.id] = 0));
+        b.rounds.forEach((r) => {
+          b.entities.forEach((e) => {
+            totals[e.id] += r.values[e.id] ? r.values[e.id].total : 0;
+          });
+        });
+        return totals;
+      }
+
+      function renderBurakoPlay() {
+        app.classList.remove("wide-mode");
+        const b = state.room.burako;
+        const totals = computeBurakoTotals();
+        const values = Object.values(totals);
+        const maxTotal = values.length ? Math.max(...values) : 0;
+        const finished = maxTotal >= b.limit;
+        const winners = finished
+          ? b.entities.filter((e) => totals[e.id] === maxTotal)
+          : [];
+
+        const totalsCards = b.entities
+          .map(
+            (e) => `
+    <div class="total-card ${finished && totals[e.id] === maxTotal ? "winner" : ""}">
+      <div class="entity-name">${e.name}</div>
+      <div class="entity-total">${totals[e.id]}</div>
+    </div>`,
+          )
+          .join("");
+
+        const formInputs = b.entities
+          .map(
+            (e) => `
+    <div class="hand-input-group">
+      <label>${e.name}</label>
+      <input type="number" id="base-${e.id}" placeholder="Base" value="0" />
+      <input type="number" id="mesa-${e.id}" placeholder="Mesa" value="0" />
+    </div>`,
+          )
+          .join("");
+
+        let historyRows = "";
+        let running = {};
+        b.entities.forEach((e) => (running[e.id] = 0));
+        b.rounds.forEach((r, idx) => {
+          b.entities.forEach((e) => {
+            running[e.id] += r.values[e.id] ? r.values[e.id].total : 0;
+          });
+          historyRows += `<tr><td>Mano ${idx + 1}</td>${b.entities
+            .map((e) => {
+              const t = r.values[e.id] ? r.values[e.id].total : 0;
+              return `<td>${t >= 0 ? "+" : ""}${t}<span class="muted"> · ${running[e.id]}</span></td>`;
+            })
+            .join("")}</tr>`;
+        });
+
+        app.innerHTML = `
+    <div class="card">
+      <div class="room-code-badge">Sala <b>${state.code}</b> <button class="copy-btn" onclick="copyCode()">📋</button></div>
+      <h2>🃏 Burako ${finished ? "· Terminado" : ""}</h2>
+      <div class="limit-info">Puntaje límite: <b>${b.limit}</b></div>
+      ${finished ? `<div class="winner-banner">🏆 Gana ${winners.map((w) => w.name).join(" y ")}</div>` : ""}
+      <div class="totals-grid">${totalsCards}</div>
+      ${
+        !finished
+          ? `
+      <div class="add-hand-section">
+        <h3>Agregar mano</h3>
+        <div class="hand-input-group" style="opacity:.6">
+          <label></label><label style="text-align:center;font-size:.75rem;text-transform:uppercase">Base</label><label style="text-align:center;font-size:.75rem;text-transform:uppercase">Mesa</label>
+        </div>
+        ${formInputs}
+        <button class="btn btn-primary" onclick="addBurakoHand()">Guardar mano</button>
+      </div>`
+          : ""
+      }
+      <h3>Historial</h3>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th></th>${b.entities.map((e) => `<th>${e.name}</th>`).join("")}</tr></thead>
+          <tbody>${historyRows || '<tr><td colspan="' + (b.entities.length + 1) + '" class="muted">Todavía no hay manos jugadas</td></tr>'}</tbody>
+        </table>
+      </div>
+      <button class="btn-link" onclick="goHome()">‹ Salir de la sala</button>
+    </div>`;
+      }
+
+      async function addBurakoHand() {
+        const b = state.room.burako;
+        const values = {};
+        for (const e of b.entities) {
+          const baseEl = document.getElementById("base-" + e.id);
+          const mesaEl = document.getElementById("mesa-" + e.id);
+          const base = parseInt(baseEl.value) || 0;
+          const mesa = parseInt(mesaEl.value) || 0;
+          values[e.id] = { base, mesa, total: base + mesa };
+        }
+        b.rounds.push({ values });
+        await saveRoom();
+        render();
+      }
+
+      /* ---------- GENERALA: SETUP ---------- */
+      function renderGeneralaSetup() {
+        app.classList.remove("wide-mode");
+        const g = state.room.generala;
+        if (!g.entities.length) {
+          g.entities = [
+            { id: "p0", name: "" },
+            { id: "p1", name: "" },
+          ];
+        }
+        const count = g.entities.length;
+        const namesHtml = g.entities
+          .map(
+            (e, i) => `
+    <input class="name-input" id="gname-${i}" placeholder="Nombre jugador ${i + 1}" value="${e.name || ""}" />
+  `,
+          )
+          .join("");
+        app.innerHTML = `
+    <div class="card">
+      <div class="room-code-badge">Sala <b>${state.code}</b> <button class="copy-btn" onclick="copyCode()">📋</button></div>
+      <h2>🎲 Configurar Generala</h2>
+      <label style="margin-top:6px">Cantidad de jugadores (2 a 10)</label>
+      <div class="count-stepper">
+        <button class="btn-round" onclick="changeGeneralaCount(-1)">−</button>
+        <span class="count-display">${count}</span>
+        <button class="btn-round" onclick="changeGeneralaCount(1)">+</button>
+      </div>
+      <div class="names-section">${namesHtml}</div>
+      <button class="btn btn-primary" onclick="startGeneralaGame()">Comenzar partida</button>
+      <button class="btn-link" onclick="goHome()">‹ Salir de la sala</button>
+    </div>`;
+      }
+
+      async function changeGeneralaCount(delta) {
+        const g = state.room.generala;
+        // preservar los nombres tipeados antes de cambiar la cantidad
+        g.entities.forEach((e, i) => {
+          const el = document.getElementById("gname-" + i);
+          if (el) e.name = el.value;
+        });
+        let count = Math.max(2, Math.min(10, g.entities.length + delta));
+        const newEntities = Array.from({ length: count }).map(
+          (_, i) => g.entities[i] || { id: "p" + i, name: "" },
+        );
+        g.entities = newEntities;
+        await saveRoom();
+        render();
+      }
+
+      async function startGeneralaGame() {
+        const g = state.room.generala;
+        g.entities.forEach((e, i) => {
+          const el = document.getElementById("gname-" + i);
+          const val = el ? el.value.trim() : "";
+          e.name = val || "Jugador " + (i + 1);
+        });
+        g.scores = {};
+        g.entities.forEach((e) => {
+          g.scores[e.id] = {
+            uno: null,
+            dos: null,
+            tres: null,
+            cuatro: null,
+            cinco: null,
+            seis: null,
+            escalera: null,
+            full: null,
+            poker: null,
+            generala: null,
+            generalaDoble: null,
+          };
+        });
+        state.room.status = "playing";
+        await saveRoom();
+        state.screen = "generala-play";
+        render();
+      }
+
+      /* ---------- GENERALA: JUGAR ---------- */
+      function computeGeneralaTotal(g, entityId) {
+        const s = g.scores[entityId];
+        let total = 0;
+        Object.values(s).forEach((v) => {
+          if (typeof v === "number") total += v;
+        });
+        return total;
+      }
+
+      function renderGeneralaPlay() {
+        app.classList.add("wide-mode");
+        const g = state.room.generala;
+        const finished = state.room.status === "finished";
+
+        const header = `<tr><th>Categoría</th>${g.entities.map((e) => `<th>${e.name}</th>`).join("")}</tr>`;
+
+        const numberRows = NUMBER_CATS.map((cat) => {
+          const cells = g.entities
+            .map((e) => {
+              const val = g.scores[e.id][cat.key];
+              const qty =
+                val !== null && val !== undefined
+                  ? Math.round(val / cat.n)
+                  : "";
+              const disabled = finished ? "disabled" : "";
+              return `<td>
+        <input type="number" min="0" max="5" class="cell-input" ${disabled}
+          data-entity="${e.id}" data-cat="${cat.key}" data-mult="${cat.n}"
+          value="${qty}" onchange="updateGeneralaNumberCell(this)" />
+        <span class="cell-points">${val !== null && val !== undefined ? "= " + val : ""}</span>
+      </td>`;
+            })
+            .join("");
+          return `<tr><td>${cat.label}</td>${cells}</tr>`;
+        }).join("");
+
+        const pointRows = POINT_CATS.map((cat) => {
+          const cells = g.entities
+            .map((e) => {
+              const val = g.scores[e.id][cat.key];
+              const disabled = finished ? "disabled" : "";
+              return `<td><input type="number" class="cell-input" ${disabled}
+        data-entity="${e.id}" data-cat="${cat.key}"
+        value="${val !== null && val !== undefined ? val : ""}" placeholder="${cat.hint}"
+        onchange="updateGeneralaPointCell(this)" /></td>`;
+            })
+            .join("");
+          return `<tr><td>${cat.label}</td>${cells}</tr>`;
+        }).join("");
+
+        const totalRow = `<tr class="total-row"><td>TOTAL</td>${g.entities.map((e) => `<td>${computeGeneralaTotal(g, e.id)}</td>`).join("")}</tr>`;
+
+        const totalsList = g.entities.map((e) => ({
+          e,
+          total: computeGeneralaTotal(g, e.id),
+        }));
+        const maxTotal = totalsList.length
+          ? Math.max(...totalsList.map((t) => t.total))
+          : 0;
+        const winners = finished
+          ? totalsList.filter((t) => t.total === maxTotal).map((t) => t.e)
+          : [];
+
+        app.innerHTML = `
+    <div class="card wide">
+      <div class="room-code-badge">Sala <b>${state.code}</b> <button class="copy-btn" onclick="copyCode()">📋</button></div>
+      <h2 style="text-align:center">🎲 Generala ${finished ? "· Terminado" : ""}</h2>
+      ${finished ? `<div class="winner-banner">🏆 Gana ${winners.map((w) => w.name).join(" y ")}</div>` : ""}
+      <div class="table-scroll">
+        <table class="scorecard">
+          <thead>${header}</thead>
+          <tbody>
+            ${numberRows}
+            ${pointRows}
+            ${totalRow}
+          </tbody>
+        </table>
+      </div>
+      ${!finished ? `<button class="btn btn-primary" onclick="finishGenerala()">Finalizar juego</button>` : ""}
+      <button class="btn-link" onclick="goHome()">‹ Salir de la sala</button>
+    </div>`;
+      }
+
+      async function updateGeneralaNumberCell(input) {
+        const entity = input.dataset.entity,
+          cat = input.dataset.cat,
+          mult = parseInt(input.dataset.mult);
+        let qty = parseInt(input.value);
+        if (isNaN(qty)) qty = 0;
+        qty = Math.max(0, Math.min(5, qty));
+        state.room.generala.scores[entity][cat] = qty * mult;
+        await saveRoom();
+        render();
+      }
+
+      async function updateGeneralaPointCell(input) {
+        const entity = input.dataset.entity,
+          cat = input.dataset.cat;
+        const raw = input.value;
+        const val = parseInt(raw);
+        state.room.generala.scores[entity][cat] =
+          raw === "" || isNaN(val) ? null : val;
+        await saveRoom();
+        render();
+      }
+
+      async function finishGenerala() {
+        state.room.status = "finished";
+        await saveRoom();
+        render();
+      }
+
+      /* ---------- Render dispatcher ---------- */
+      function render() {
+        switch (state.screen) {
+          case "home":
+            renderHome();
+            break;
+          case "choose-game":
+            renderChooseGame();
+            break;
+          case "burako-setup":
+            renderBurakoSetup();
+            break;
+          case "burako-play":
+            renderBurakoPlay();
+            break;
+          case "generala-setup":
+            renderGeneralaSetup();
+            break;
+          case "generala-play":
+            renderGeneralaPlay();
+            break;
+          default:
+            renderHome();
+        }
+      }
+
+      /* ---------- Inicio ---------- */
+      (async function init() {
+        const params = new URLSearchParams(location.search);
+        const roomParam = params.get("room");
+        if (roomParam) {
+          const code = roomParam.toUpperCase();
+          const room = await loadRoom(code);
+          if (room) {
+            state.code = code;
+            state.room = room;
+            routeToScreen();
+            startPolling();
+          }
+        }
+        render();
+      })();
+    </script>
+  </body>
+</html>
