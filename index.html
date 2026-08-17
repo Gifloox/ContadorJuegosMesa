@@ -547,7 +547,8 @@
   </head>
   <body>
     <div id="app"></div>
-
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
     <script>
       /* ---------- Estado ---------- */
       let state = {
@@ -574,6 +575,19 @@
         { key: "generala", label: "Generala", hint: "ej: 50" },
         { key: "generalaDoble", label: "Generala Doble", hint: "ej: 100" },
       ];
+      /* ---------- Configuración de Firebase ---------- */
+      const firebaseConfig = {
+        apiKey: "AIzaSyAcj-EIGLk9nRgcz3KtK4BsCbuwzaGOjI0",
+        authDomain: "contador-juegos-de-mesa.firebaseapp.com",
+        projectId: "contador-juegos-de-mesa",
+        storageBucket: "contador-juegos-de-mesa.firebasestorage.app",
+        messagingSenderId: "832032047656",
+        appId: "1:832032047656:web:82ac9b1fb22ac35bbc2b1d",
+      };
+
+      // Inicializar Firebase y Firestore
+      firebase.initializeApp(firebaseConfig);
+      const db = firebase.firestore();
 
       /* ---------- Storage helpers ---------- */
       function genCode() {
@@ -587,31 +601,26 @@
       async function saveRoom() {
         if (!state.code || !state.room) return;
         try {
-          await window.storage.set(
-            "room-" + state.code,
-            JSON.stringify(state.room),
-            true,
-          );
+          // Guarda o pisa el documento en la colección "rooms" usando el código como ID
+          await db.collection("rooms").doc(state.code).set(state.room);
         } catch (e) {
-          console.error("Error guardando sala", e);
+          console.error("Error guardando sala en Firebase", e);
         }
       }
 
       async function loadRoom(code) {
         try {
-          const res = await window.storage.get("room-" + code, true);
-          if (res && res.value) return JSON.parse(res.value);
-          return null;
+          // Busca el documento por su código
+          const docRef = await db.collection("rooms").doc(code).get();
+          if (docRef.exists) {
+            return docRef.data(); // Devuelve el objeto guardado
+          } else {
+            return null; // La sala no existe
+          }
         } catch (e) {
+          console.error("Error cargando sala desde Firebase", e);
           return null;
         }
-      }
-
-      function syncUrl() {
-        try {
-          if (state.code) history.replaceState(null, "", "?room=" + state.code);
-          else history.replaceState(null, "", location.pathname);
-        } catch (e) {}
       }
 
       /* ---------- Navegación ---------- */
