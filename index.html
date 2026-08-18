@@ -871,7 +871,7 @@
           namesHtml = Array.from({ length: b.mode })
             .map(
               (_, i) => `
-      <input class="name-input" id="bname-${i}" placeholder="Nombre jugador ${i + 1}" value="${(b.entities[i] && b.entities[i].name) || ""}" />
+      <input class="name-input" id="bname-${i}" placeholder="${i + 1}° Jugador ${i === 0 ? "(Empieza)" : ""}" value="${(b.entities[i] && b.entities[i].name) || ""}" />
     `,
             )
             .join("");
@@ -880,14 +880,14 @@
       <div style="background: rgba(0,0,0,0.02); border: 1px solid var(--card-border); padding: 14px 14px 8px; border-radius: 12px; margin-bottom: 14px;">
         <label style="margin-top:0; color:var(--gold-dark);">Primer Equipo</label>
         <input class="name-input" id="bname-0" placeholder="Nombre del Equipo" value="${(b.entities[0] && b.entities[0].name) || "Nosotros"}" />
-        <input class="name-input" id="bplayer-0" placeholder="Jugador 1 (Empieza la ronda)" value="${b.players?.[0] || ""}" style="font-size:0.9rem; margin-bottom:6px; background:#f9f6ef" />
-        <input class="name-input" id="bplayer-2" placeholder="Jugador 3 (Compañero)" value="${b.players?.[2] || ""}" style="font-size:0.9rem; margin-bottom:0; background:#f9f6ef" />
+        <input class="name-input" id="bplayer-0" placeholder="1° Jugador (Empieza la partida)" value="${b.players?.[0] || ""}" style="font-size:0.9rem; margin-bottom:6px; background:#f9f6ef" />
+        <input class="name-input" id="bplayer-2" placeholder="3° Jugador (Compañero del 1°)" value="${b.players?.[2] || ""}" style="font-size:0.9rem; margin-bottom:0; background:#f9f6ef" />
       </div>
       <div style="background: rgba(0,0,0,0.02); border: 1px solid var(--card-border); padding: 14px 14px 8px; border-radius: 12px;">
         <label style="margin-top:0; color:var(--gold-dark);">Segundo Equipo</label>
         <input class="name-input" id="bname-1" placeholder="Nombre del Equipo" value="${(b.entities[1] && b.entities[1].name) || "Ellos"}" />
-        <input class="name-input" id="bplayer-1" placeholder="Jugador 2 (Siguiente a la derecha)" value="${b.players?.[1] || ""}" style="font-size:0.9rem; margin-bottom:6px; background:#f9f6ef" />
-        <input class="name-input" id="bplayer-3" placeholder="Jugador 4 (Compañero)" value="${b.players?.[3] || ""}" style="font-size:0.9rem; margin-bottom:0; background:#f9f6ef" />
+        <input class="name-input" id="bplayer-1" placeholder="2° Jugador (Rival a la derecha)" value="${b.players?.[1] || ""}" style="font-size:0.9rem; margin-bottom:6px; background:#f9f6ef" />
+        <input class="name-input" id="bplayer-3" placeholder="4° Jugador (Compañero del 2°)" value="${b.players?.[3] || ""}" style="font-size:0.9rem; margin-bottom:0; background:#f9f6ef" />
       </div>
     `;
         }
@@ -906,7 +906,7 @@
         b.mode
           ? `
         <div class="names-section">
-          ${b.mode === 4 ? "" : "<label>Nombres</label>"}
+          ${b.mode === 4 ? "" : "<label>Nombres (en orden de juego. El 1° empieza)</label>"}
           ${namesHtml}
         </div>
         <label>Puntaje límite para ganar</label>
@@ -952,19 +952,20 @@
             document.getElementById("bplayer-2")?.value.trim() || "Jugador 3",
             document.getElementById("bplayer-3")?.value.trim() || "Jugador 4",
           ];
-          b.startIndex = Math.floor(Math.random() * 4);
         } else {
           b.entities.forEach((e, i) => {
             const el = document.getElementById("bname-" + i);
             const val = el ? el.value.trim() : "";
             e.name = val || "Jugador " + (i + 1);
           });
-          b.startIndex = Math.floor(Math.random() * b.entities.length);
         }
+
         const limitVal = parseInt(document.getElementById("blimit").value);
         b.limit = isNaN(limitVal) ? 3000 : limitVal;
         b.rounds = [];
+        b.startIndex = 0; // Se fuerza a que empiece el que pusieron primero
         state.room.status = "playing";
+
         await saveRoom();
         state.screen = "burako-play";
         render();
@@ -1146,7 +1147,7 @@
         const b = state.room.burako;
         b.rounds = [];
         const turnCount = b.mode === 4 ? 4 : b.entities.length;
-        b.startIndex = Math.floor(Math.random() * turnCount);
+        b.startIndex = (b.startIndex + 1) % turnCount; // Avanza al siguiente para empezar
         state.room.status = "playing";
         await saveRoom();
         render();
@@ -1166,7 +1167,7 @@
         const namesHtml = g.entities
           .map(
             (e, i) => `
-    <input class="name-input" id="gname-${i}" placeholder="Nombre jugador ${i + 1}" value="${e.name || ""}" />
+    <input class="name-input" id="gname-${i}" placeholder="${i + 1}° Jugador ${i === 0 ? "(Empieza)" : ""}" value="${e.name || ""}" />
   `,
           )
           .join("");
@@ -1180,7 +1181,10 @@
         <span class="count-display">${count}</span>
         <button class="btn-round" onclick="changeGeneralaCount(1)">+</button>
       </div>
-      <div class="names-section">${namesHtml}</div>
+      <div class="names-section">
+        <label style="color: var(--ink-soft); font-size: 0.8rem;">Nombres (en orden de juego. El 1° empieza)</label>
+        ${namesHtml}
+      </div>
       <button class="btn btn-primary" onclick="startGeneralaGame()">Comenzar partida</button>
       <button class="btn-link" onclick="goHome()">‹ Salir de la sala</button>
     </div>`;
@@ -1224,9 +1228,11 @@
             generalaDoble: null,
           };
         });
-        g.startIndex = Math.floor(Math.random() * g.entities.length);
+
+        g.startIndex = 0; // Se fuerza a que empiece el que escribieron primero
         g.turn = g.startIndex;
         state.room.status = "playing";
+
         await saveRoom();
         state.screen = "generala-play";
         render();
@@ -1251,21 +1257,19 @@
       };
 
       window.endGeneralaTurn = async function (e) {
-        if (e) e.preventDefault(); // Evita que se pierda el foco erróneamente en el input
+        if (e) e.preventDefault();
 
         const btn = e ? e.currentTarget : null;
         if (btn) {
           btn.innerHTML = '<span class="spinner"></span> Procesando...';
-          btn.style.pointerEvents = "none"; // Evitar el doble toque
+          btn.style.pointerEvents = "none";
         }
 
-        // Si el usuario estaba escribiendo un puntaje, forzamos que se guarde antes de pasar el turno
         if (
           document.activeElement &&
           document.activeElement.tagName === "INPUT"
         ) {
           document.activeElement.blur();
-          // Esperar un instante para que el evento onchange (updateGeneralaPointCell) termine
           await new Promise((r) => setTimeout(r, 150));
         }
 
@@ -1408,7 +1412,7 @@
             generalaDoble: null,
           };
         });
-        g.startIndex = Math.floor(Math.random() * g.entities.length);
+        g.startIndex = (g.startIndex + 1) % g.entities.length; // Avanza al siguiente para empezar
         g.turn = g.startIndex;
         state.room.status = "playing";
         await saveRoom();
