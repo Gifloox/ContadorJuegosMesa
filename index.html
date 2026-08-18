@@ -594,7 +594,6 @@
         font-family: "Space Mono", monospace;
         transition: all 0.2s ease;
       }
-      /* Estilo para los inputs de Generala que ya tienen valor */
       table td .cell-input.filled {
         background-color: rgba(200, 155, 60, 0.2);
         border-color: var(--gold);
@@ -614,7 +613,6 @@
         background: #fff8e8;
       }
 
-      /* Detalle extra en la celda del historial de Burako */
       .burako-history-cell {
         padding: 10px 8px;
         line-height: 1.3;
@@ -841,6 +839,7 @@
           state.room.burako = {
             mode: null,
             entities: [],
+            players: [],
             limit: 3000,
             rounds: [],
             startIndex: 0,
@@ -863,6 +862,7 @@
         app.classList.remove("wide-mode");
         const b = state.room.burako;
         let namesHtml = "";
+
         if (b.mode === 2 || b.mode === 3) {
           namesHtml = Array.from({ length: b.mode })
             .map(
@@ -873,10 +873,21 @@
             .join("");
         } else if (b.mode === 4) {
           namesHtml = `
-      <input class="name-input" id="bname-0" placeholder="Nombre equipo N" value="${(b.entities[0] && b.entities[0].name) || "Nosotros"}" />
-      <input class="name-input" id="bname-1" placeholder="Nombre equipo E" value="${(b.entities[1] && b.entities[1].name) || "Ellos"}" />
+      <div style="background: rgba(0,0,0,0.02); border: 1px solid var(--card-border); padding: 14px 14px 8px; border-radius: 12px; margin-bottom: 14px;">
+        <label style="margin-top:0; color:var(--gold-dark);">Primer Equipo</label>
+        <input class="name-input" id="bname-0" placeholder="Nombre del Equipo" value="${(b.entities[0] && b.entities[0].name) || "Nosotros"}" />
+        <input class="name-input" id="bplayer-0" placeholder="Jugador 1 (Empieza la ronda)" value="${b.players?.[0] || ""}" style="font-size:0.9rem; margin-bottom:6px; background:#f9f6ef" />
+        <input class="name-input" id="bplayer-2" placeholder="Jugador 3 (Compañero)" value="${b.players?.[2] || ""}" style="font-size:0.9rem; margin-bottom:0; background:#f9f6ef" />
+      </div>
+      <div style="background: rgba(0,0,0,0.02); border: 1px solid var(--card-border); padding: 14px 14px 8px; border-radius: 12px;">
+        <label style="margin-top:0; color:var(--gold-dark);">Segundo Equipo</label>
+        <input class="name-input" id="bname-1" placeholder="Nombre del Equipo" value="${(b.entities[1] && b.entities[1].name) || "Ellos"}" />
+        <input class="name-input" id="bplayer-1" placeholder="Jugador 2 (Siguiente a la derecha)" value="${b.players?.[1] || ""}" style="font-size:0.9rem; margin-bottom:6px; background:#f9f6ef" />
+        <input class="name-input" id="bplayer-3" placeholder="Jugador 4 (Compañero)" value="${b.players?.[3] || ""}" style="font-size:0.9rem; margin-bottom:0; background:#f9f6ef" />
+      </div>
     `;
         }
+
         app.innerHTML = `
     <div class="card">
       <div class="room-code-badge">Sala <b>${state.code}</b> <button class="copy-btn" onclick="copyCode()">📋</button></div>
@@ -891,7 +902,7 @@
         b.mode
           ? `
         <div class="names-section">
-          <label>Nombres</label>
+          ${b.mode === 4 ? "" : "<label>Nombres</label>"}
           ${namesHtml}
         </div>
         <label>Puntaje límite para ganar</label>
@@ -912,11 +923,13 @@
             { id: "N", name: "Nosotros" },
             { id: "E", name: "Ellos" },
           ];
+          b.players = ["", "", "", ""];
         } else {
           b.entities = Array.from({ length: mode }).map((_, i) => ({
             id: "p" + i,
             name: "",
           }));
+          b.players = [];
         }
         await saveRoom();
         render();
@@ -924,21 +937,29 @@
 
       async function startBurakoGame() {
         const b = state.room.burako;
-        b.entities.forEach((e, i) => {
-          const el = document.getElementById("bname-" + i);
-          const val = el ? el.value.trim() : "";
-          e.name =
-            val ||
-            (b.mode === 4
-              ? i === 0
-                ? "Nosotros"
-                : "Ellos"
-              : "Jugador " + (i + 1));
-        });
+        if (b.mode === 4) {
+          b.entities[0].name =
+            document.getElementById("bname-0")?.value.trim() || "Nosotros";
+          b.entities[1].name =
+            document.getElementById("bname-1")?.value.trim() || "Ellos";
+          b.players = [
+            document.getElementById("bplayer-0")?.value.trim() || "Jugador 1",
+            document.getElementById("bplayer-1")?.value.trim() || "Jugador 2",
+            document.getElementById("bplayer-2")?.value.trim() || "Jugador 3",
+            document.getElementById("bplayer-3")?.value.trim() || "Jugador 4",
+          ];
+          b.startIndex = Math.floor(Math.random() * 4);
+        } else {
+          b.entities.forEach((e, i) => {
+            const el = document.getElementById("bname-" + i);
+            const val = el ? el.value.trim() : "";
+            e.name = val || "Jugador " + (i + 1);
+          });
+          b.startIndex = Math.floor(Math.random() * b.entities.length);
+        }
         const limitVal = parseInt(document.getElementById("blimit").value);
         b.limit = isNaN(limitVal) ? 3000 : limitVal;
         b.rounds = [];
-        b.startIndex = Math.floor(Math.random() * b.entities.length);
         state.room.status = "playing";
         await saveRoom();
         state.screen = "burako-play";
@@ -989,8 +1010,20 @@
           ? b.entities.filter((e) => totals[e.id] === maxTotal)
           : [];
 
-        const turnIndex = (b.startIndex + b.rounds.length) % b.entities.length;
-        const currentStarter = b.entities[turnIndex];
+        const turnCount = b.mode === 4 ? 4 : b.entities.length;
+        const turnIndex = (b.startIndex + b.rounds.length) % turnCount;
+        let currentStarterName = "";
+
+        if (b.mode === 4) {
+          const teamIndex = turnIndex % 2;
+          const pName =
+            b.players && b.players[turnIndex]
+              ? b.players[turnIndex]
+              : "Jugador " + (turnIndex + 1);
+          currentStarterName = `${pName} <span style="font-size:0.85rem; font-weight:normal; opacity:0.85">(${b.entities[teamIndex].name})</span>`;
+        } else {
+          currentStarterName = b.entities[turnIndex].name;
+        }
 
         const totalsCards = b.entities
           .map((e) => {
@@ -1054,7 +1087,7 @@
       ${
         finished
           ? `<div class="winner-banner">🏆 Gana ${winners.map((w) => w.name).join(" y ")}</div>`
-          : `<div class="turn-banner">Ronda ${b.rounds.length + 1} · Empieza / Reparte: <b>${currentStarter.name}</b></div>`
+          : `<div class="turn-banner">Ronda ${b.rounds.length + 1} · Empieza / Reparte: <br><b>${currentStarterName}</b></div>`
       }
       
       <div class="totals-grid">${totalsCards}</div>
@@ -1108,7 +1141,8 @@
       async function restartBurako() {
         const b = state.room.burako;
         b.rounds = [];
-        b.startIndex = Math.floor(Math.random() * b.entities.length);
+        const turnCount = b.mode === 4 ? 4 : b.entities.length;
+        b.startIndex = Math.floor(Math.random() * turnCount);
         state.room.status = "playing";
         await saveRoom();
         render();
@@ -1318,7 +1352,6 @@
 
         g.scores[entity][cat] = newVal;
 
-        // Si se agregó un número nuevo donde antes no había, avanza el turno automático
         if (oldVal === null && newVal !== null) {
           g.turn = (g.turn + 1) % g.entities.length;
         }
@@ -1359,6 +1392,12 @@
 
       /* ---------- Render dispatcher ---------- */
       function render() {
+        // Guardar posiciones de scroll
+        const scrollEl = document.querySelector(".table-scroll");
+        const savedTableScroll = scrollEl ? scrollEl.scrollLeft : 0;
+        const savedWindowScroll =
+          window.scrollY || document.documentElement.scrollTop;
+
         switch (state.screen) {
           case "home":
             renderHome();
@@ -1381,6 +1420,13 @@
           default:
             renderHome();
         }
+
+        // Restaurar posiciones de scroll
+        const newScrollEl = document.querySelector(".table-scroll");
+        if (newScrollEl && savedTableScroll > 0) {
+          newScrollEl.scrollLeft = savedTableScroll;
+        }
+        window.scrollTo(0, savedWindowScroll);
       }
 
       /* ---------- Inicio ---------- */
