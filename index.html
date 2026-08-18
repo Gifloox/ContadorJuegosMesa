@@ -168,6 +168,12 @@
       .btn:active {
         transform: scale(0.98);
       }
+      .btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none !important;
+        box-shadow: none !important;
+      }
       .btn-primary {
         background: linear-gradient(
           180deg,
@@ -178,7 +184,7 @@
         margin-top: 18px;
         box-shadow: 0 8px 18px -8px rgba(200, 155, 60, 0.6);
       }
-      .btn-primary:hover {
+      .btn-primary:hover:not(:disabled) {
         box-shadow: 0 10px 22px -6px rgba(200, 155, 60, 0.75);
       }
       .btn-secondary {
@@ -196,6 +202,23 @@
         margin-top: 18px;
         cursor: pointer;
         text-decoration: underline;
+      }
+
+      .spinner {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(42, 31, 8, 0.3);
+        border-top-color: #2a1f08;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-right: 8px;
+        vertical-align: middle;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
       }
 
       .divider {
@@ -380,6 +403,9 @@
         border-radius: 12px;
         padding: 14px 10px;
         text-align: center;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
       }
       .total-card.winner {
         background: linear-gradient(
@@ -388,6 +414,10 @@
           var(--gold-dark) 100%
         );
         color: #2a1f08;
+      }
+      .total-card.winner .entity-diff {
+        color: #2a1f08;
+        opacity: 0.7;
       }
       .entity-name {
         font-size: 0.75rem;
@@ -401,6 +431,16 @@
         font-size: 1.5rem;
         font-weight: 700;
       }
+      .entity-diff {
+        font-size: 0.8rem;
+        color: var(--gold);
+        margin-top: 6px;
+        font-family: "Inter", sans-serif;
+        font-weight: 600;
+      }
+      .entity-diff.leader {
+        color: rgba(255, 255, 255, 0.5);
+      }
 
       .limit-info {
         text-align: center;
@@ -409,6 +449,43 @@
         margin-top: -4px;
       }
 
+      .turn-banner {
+        background: rgba(200, 155, 60, 0.15);
+        border: 1px solid var(--gold);
+        color: var(--ink);
+        text-align: center;
+        padding: 10px;
+        border-radius: 10px;
+        margin: 14px 0 0;
+        font-size: 0.95rem;
+      }
+      .turn-controls {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        background: var(--felt-dark);
+        color: var(--parchment);
+        padding: 10px 16px;
+        border-radius: 12px;
+        margin: 14px 0 0;
+      }
+      .turn-controls .btn-icon {
+        background: rgba(255, 255, 255, 0.15);
+        border: none;
+        color: white;
+        border-radius: 8px;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+        cursor: pointer;
+      }
+      .turn-controls .btn-icon:hover {
+        background: rgba(255, 255, 255, 0.3);
+      }
       .winner-banner {
         background: linear-gradient(
           180deg,
@@ -467,6 +544,9 @@
         border-bottom: 1px solid var(--card-border);
         text-align: center;
         white-space: nowrap;
+        transition:
+          background-color 0.2s,
+          opacity 0.2s;
       }
       table th {
         font-family: "Inter", sans-serif;
@@ -488,6 +568,19 @@
       table.scorecard td:first-child {
         min-width: 130px;
       }
+
+      table td.locked-col {
+        background: rgba(0, 0, 0, 0.04);
+      }
+      table th.locked-col {
+        opacity: 0.5;
+      }
+      table td.locked-col input {
+        background: transparent;
+        border-color: transparent;
+        opacity: 0.6;
+      }
+
       .muted {
         color: var(--ink-soft);
         font-size: 0.78rem;
@@ -499,12 +592,14 @@
         margin: 0;
         text-align: center;
         font-family: "Space Mono", monospace;
+        transition: all 0.2s ease;
       }
-      .cell-points {
-        display: block;
-        font-size: 0.7rem;
-        color: var(--green-ok);
-        font-family: "Space Mono", monospace;
+      /* Estilo para los inputs de Generala que ya tienen valor */
+      table td .cell-input.filled {
+        background-color: rgba(200, 155, 60, 0.2);
+        border-color: var(--gold);
+        font-weight: 700;
+        color: var(--ink);
       }
 
       .total-row td {
@@ -519,20 +614,10 @@
         background: #fff8e8;
       }
 
-      .share-row {
-        display: flex;
-        gap: 8px;
-        margin-top: 10px;
-      }
-      .share-row .btn {
-        margin-top: 0;
-        font-size: 0.85rem;
-        padding: 10px;
-      }
-
-      ::selection {
-        background: var(--gold);
-        color: #2a1f08;
+      /* Detalle extra en la celda del historial de Burako */
+      .burako-history-cell {
+        padding: 10px 8px;
+        line-height: 1.3;
       }
 
       @media (max-width: 480px) {
@@ -586,7 +671,6 @@
         appId: "1:832032047656:web:82ac9b1fb22ac35bbc2b1d",
       };
 
-      // Inicializar Firebase y Firestore
       firebase.initializeApp(firebaseConfig);
       const db = firebase.firestore();
 
@@ -602,7 +686,6 @@
       async function saveRoom() {
         if (!state.code || !state.room) return;
         try {
-          // Guarda o pisa el documento en la colección "rooms" usando el código como ID
           await db.collection("rooms").doc(state.code).set(state.room);
         } catch (e) {
           console.error("Error guardando sala en Firebase", e);
@@ -611,12 +694,11 @@
 
       async function loadRoom(code) {
         try {
-          // Busca el documento por su código
           const docRef = await db.collection("rooms").doc(code).get();
           if (docRef.exists) {
-            return docRef.data(); // Devuelve el objeto guardado
+            return docRef.data();
           } else {
-            return null; // La sala no existe
+            return null;
           }
         } catch (e) {
           console.error("Error cargando sala desde Firebase", e);
@@ -678,12 +760,6 @@
         const text = state.code;
         if (navigator.clipboard) {
           navigator.clipboard.writeText(text).catch(() => {});
-        }
-      }
-      function copyLink() {
-        const url = location.origin + location.pathname + "?room=" + state.code;
-        if (navigator.clipboard) {
-          navigator.clipboard.writeText(url).catch(() => {});
         }
       }
 
@@ -767,9 +843,15 @@
             entities: [],
             limit: 3000,
             rounds: [],
+            startIndex: 0,
           };
         } else {
-          state.room.generala = { entities: [], scores: {} };
+          state.room.generala = {
+            entities: [],
+            scores: {},
+            startIndex: 0,
+            turn: 0,
+          };
         }
         await saveRoom();
         state.screen = game + "-setup";
@@ -856,6 +938,7 @@
         const limitVal = parseInt(document.getElementById("blimit").value);
         b.limit = isNaN(limitVal) ? 3000 : limitVal;
         b.rounds = [];
+        b.startIndex = Math.floor(Math.random() * b.entities.length);
         state.room.status = "playing";
         await saveRoom();
         state.screen = "burako-play";
@@ -875,6 +958,26 @@
         return totals;
       }
 
+      window.checkBurakoInputs = function () {
+        const b = state.room.burako;
+        let allFilled = true;
+        for (const e of b.entities) {
+          const baseEl = document.getElementById("base-" + e.id);
+          const mesaEl = document.getElementById("mesa-" + e.id);
+          if (
+            !baseEl ||
+            !mesaEl ||
+            baseEl.value === "" ||
+            mesaEl.value === ""
+          ) {
+            allFilled = false;
+            break;
+          }
+        }
+        const btn = document.getElementById("btn-add-hand");
+        if (btn) btn.disabled = !allFilled;
+      };
+
       function renderBurakoPlay() {
         app.classList.remove("wide-mode");
         const b = state.room.burako;
@@ -886,14 +989,28 @@
           ? b.entities.filter((e) => totals[e.id] === maxTotal)
           : [];
 
+        const turnIndex = (b.startIndex + b.rounds.length) % b.entities.length;
+        const currentStarter = b.entities[turnIndex];
+
         const totalsCards = b.entities
-          .map(
-            (e) => `
-    <div class="total-card ${finished && totals[e.id] === maxTotal ? "winner" : ""}">
+          .map((e) => {
+            const t = totals[e.id];
+            const diff = maxTotal - t;
+            let diffHtml = "";
+            if (maxTotal > 0) {
+              if (diff > 0) {
+                diffHtml = `<div class="entity-diff">a ${diff} pts</div>`;
+              } else {
+                diffHtml = `<div class="entity-diff leader">Líder</div>`;
+              }
+            }
+            return `
+    <div class="total-card ${finished && t === maxTotal ? "winner" : ""}">
       <div class="entity-name">${e.name}</div>
-      <div class="entity-total">${totals[e.id]}</div>
-    </div>`,
-          )
+      <div class="entity-total">${t}</div>
+      ${diffHtml}
+    </div>`;
+          })
           .join("");
 
         const formInputs = b.entities
@@ -901,8 +1018,8 @@
             (e) => `
     <div class="hand-input-group">
       <label>${e.name}</label>
-      <input type="number" id="base-${e.id}" placeholder="Base" value="0" />
-      <input type="number" id="mesa-${e.id}" placeholder="Mesa" value="0" />
+      <input type="number" id="base-${e.id}" placeholder="Base" oninput="checkBurakoInputs()" />
+      <input type="number" id="mesa-${e.id}" placeholder="Mesa" oninput="checkBurakoInputs()" />
     </div>`,
           )
           .join("");
@@ -916,8 +1033,14 @@
           });
           historyRows += `<tr><td>Mano ${idx + 1}</td>${b.entities
             .map((e) => {
+              const base = r.values[e.id] ? r.values[e.id].base : 0;
+              const mesa = r.values[e.id] ? r.values[e.id].mesa : 0;
               const t = r.values[e.id] ? r.values[e.id].total : 0;
-              return `<td>${t >= 0 ? "+" : ""}${t}<span class="muted"> · ${running[e.id]}</span></td>`;
+              return `<td class="burako-history-cell">
+                <div style="font-weight: 700; font-size: 1.05rem; color: ${t < 0 ? "var(--red)" : "var(--ink)"}">${t > 0 ? "+" : ""}${t}</div>
+                <div class="muted" style="font-size: 0.7rem;">B: ${base} | M: ${mesa}</div>
+                <div style="font-size: 0.8rem; margin-top: 4px; color: var(--gold-dark); font-weight: 600;">∑ ${running[e.id]}</div>
+              </td>`;
             })
             .join("")}</tr>`;
         });
@@ -927,7 +1050,13 @@
       <div class="room-code-badge">Sala <b>${state.code}</b> <button class="copy-btn" onclick="copyCode()">📋</button></div>
       <h2>🃏 Burako ${finished ? "· Terminado" : ""}</h2>
       <div class="limit-info">Puntaje límite: <b>${b.limit}</b></div>
-      ${finished ? `<div class="winner-banner">🏆 Gana ${winners.map((w) => w.name).join(" y ")}</div>` : ""}
+      
+      ${
+        finished
+          ? `<div class="winner-banner">🏆 Gana ${winners.map((w) => w.name).join(" y ")}</div>`
+          : `<div class="turn-banner">Ronda ${b.rounds.length + 1} · Empieza / Reparte: <b>${currentStarter.name}</b></div>`
+      }
+      
       <div class="totals-grid">${totalsCards}</div>
       ${
         !finished
@@ -938,11 +1067,13 @@
           <label></label><label style="text-align:center;font-size:.75rem;text-transform:uppercase">Base</label><label style="text-align:center;font-size:.75rem;text-transform:uppercase">Mesa</label>
         </div>
         ${formInputs}
-        <button class="btn btn-primary" onclick="addBurakoHand()">Guardar mano</button>
+        <button class="btn btn-primary" id="btn-add-hand" onclick="addBurakoHand()" disabled>Guardar mano</button>
       </div>`
-          : ""
+          : `
+      <button class="btn btn-primary" onclick="restartBurako()">Jugar otra partida (Mismos equipos)</button>
+          `
       }
-      <h3>Historial</h3>
+      <h3>Historial de Manos</h3>
       <div class="table-scroll">
         <table>
           <thead><tr><th></th>${b.entities.map((e) => `<th>${e.name}</th>`).join("")}</tr></thead>
@@ -954,6 +1085,12 @@
       }
 
       async function addBurakoHand() {
+        const btn = document.getElementById("btn-add-hand");
+        if (btn) {
+          btn.disabled = true;
+          btn.innerHTML = '<span class="spinner"></span> Guardando...';
+        }
+
         const b = state.room.burako;
         const values = {};
         for (const e of b.entities) {
@@ -964,6 +1101,15 @@
           values[e.id] = { base, mesa, total: base + mesa };
         }
         b.rounds.push({ values });
+        await saveRoom();
+        render();
+      }
+
+      async function restartBurako() {
+        const b = state.room.burako;
+        b.rounds = [];
+        b.startIndex = Math.floor(Math.random() * b.entities.length);
+        state.room.status = "playing";
         await saveRoom();
         render();
       }
@@ -1004,7 +1150,6 @@
 
       async function changeGeneralaCount(delta) {
         const g = state.room.generala;
-        // preservar los nombres tipeados antes de cambiar la cantidad
         g.entities.forEach((e, i) => {
           const el = document.getElementById("gname-" + i);
           if (el) e.name = el.value;
@@ -1041,6 +1186,8 @@
             generalaDoble: null,
           };
         });
+        g.startIndex = Math.floor(Math.random() * g.entities.length);
+        g.turn = g.startIndex;
         state.room.status = "playing";
         await saveRoom();
         state.screen = "generala-play";
@@ -1057,48 +1204,61 @@
         return total;
       }
 
+      window.changeGeneralaTurn = async function (delta) {
+        const g = state.room.generala;
+        const len = g.entities.length;
+        g.turn = (g.turn + delta + len) % len;
+        await saveRoom();
+        render();
+      };
+
       function renderGeneralaPlay() {
         app.classList.add("wide-mode");
         const g = state.room.generala;
         const finished = state.room.status === "finished";
 
-        const header = `<tr><th>Categoría</th>${g.entities.map((e) => `<th>${e.name}</th>`).join("")}</tr>`;
+        const header = `<tr><th>Categoría</th>${g.entities.map((e, i) => `<th class="${i !== g.turn && !finished ? "locked-col" : ""}">${e.name}</th>`).join("")}</tr>`;
 
-        const numberRows = NUMBER_CATS.map((cat) => {
-          const cells = g.entities
-            .map((e) => {
-              const val = g.scores[e.id][cat.key];
-              const qty =
-                val !== null && val !== undefined
-                  ? Math.round(val / cat.n)
-                  : "";
-              const disabled = finished ? "disabled" : "";
-              return `<td>
-        <input type="number" min="0" max="5" class="cell-input" ${disabled}
-          data-entity="${e.id}" data-cat="${cat.key}" data-mult="${cat.n}"
-          value="${qty}" onchange="updateGeneralaNumberCell(this)" />
-        <span class="cell-points">${val !== null && val !== undefined ? "= " + val : ""}</span>
+        const renderRows = (categories) =>
+          categories
+            .map((cat) => {
+              const cells = g.entities
+                .map((e, i) => {
+                  const val = g.scores[e.id][cat.key];
+                  const isTurn = i === g.turn;
+                  const disabled = !isTurn || finished ? "disabled" : "";
+                  const lockedClass = !isTurn && !finished ? "locked-col" : "";
+                  const isFilled = val !== null && val !== undefined;
+                  const filledClass = isFilled ? "filled" : "";
+
+                  return `<td class="${lockedClass}">
+        <input type="number" class="cell-input ${filledClass}" ${disabled}
+          data-entity="${e.id}" data-cat="${cat.key}"
+          value="${isFilled ? val : ""}" 
+          placeholder="${cat.hint || "ej: " + cat.n * 3}"
+          onchange="updateGeneralaPointCell(this)" />
       </td>`;
+                })
+                .join("");
+              return `<tr><td>${cat.label}</td>${cells}</tr>`;
             })
             .join("");
-          return `<tr><td>${cat.label}</td>${cells}</tr>`;
-        }).join("");
 
-        const pointRows = POINT_CATS.map((cat) => {
-          const cells = g.entities
-            .map((e) => {
-              const val = g.scores[e.id][cat.key];
-              const disabled = finished ? "disabled" : "";
-              return `<td><input type="number" class="cell-input" ${disabled}
-        data-entity="${e.id}" data-cat="${cat.key}"
-        value="${val !== null && val !== undefined ? val : ""}" placeholder="${cat.hint}"
-        onchange="updateGeneralaPointCell(this)" /></td>`;
-            })
-            .join("");
-          return `<tr><td>${cat.label}</td>${cells}</tr>`;
-        }).join("");
+        const numberRows = renderRows(NUMBER_CATS);
+        const pointRows = renderRows(POINT_CATS);
 
-        const totalRow = `<tr class="total-row"><td>TOTAL</td>${g.entities.map((e) => `<td>${computeGeneralaTotal(g, e.id)}</td>`).join("")}</tr>`;
+        const totalRow = `<tr class="total-row"><td>TOTAL</td>${g.entities
+          .map((e) => {
+            const totalPts = computeGeneralaTotal(g, e.id);
+            const filledCount = Object.values(g.scores[e.id]).filter(
+              (v) => v !== null,
+            ).length;
+            return `<td>
+            <div>${totalPts}</div>
+            <div style="font-size:0.7rem; font-weight:normal; color:var(--ink-soft); margin-top:2px;">${filledCount}/11 listas</div>
+          </td>`;
+          })
+          .join("")}</tr>`;
 
         const totalsList = g.entities.map((e) => ({
           e,
@@ -1115,7 +1275,18 @@
     <div class="card wide">
       <div class="room-code-badge">Sala <b>${state.code}</b> <button class="copy-btn" onclick="copyCode()">📋</button></div>
       <h2 style="text-align:center">🎲 Generala ${finished ? "· Terminado" : ""}</h2>
-      ${finished ? `<div class="winner-banner">🏆 Gana ${winners.map((w) => w.name).join(" y ")}</div>` : ""}
+      
+      ${
+        finished
+          ? `<div class="winner-banner">🏆 Gana ${winners.map((w) => w.name).join(" y ")}</div>`
+          : `
+        <div class="turn-controls">
+          <button class="btn-icon" onclick="changeGeneralaTurn(-1)" title="Retroceder turno">‹</button>
+          <div>Le toca jugar a: <b>${g.entities[g.turn].name}</b></div>
+          <button class="btn-icon" onclick="changeGeneralaTurn(1)" title="Avanzar turno">›</button>
+        </div>`
+      }
+      
       <div class="table-scroll">
         <table class="scorecard">
           <thead>${header}</thead>
@@ -1126,21 +1297,13 @@
           </tbody>
         </table>
       </div>
-      ${!finished ? `<button class="btn btn-primary" onclick="finishGenerala()">Finalizar juego</button>` : ""}
+      ${
+        !finished
+          ? `<button class="btn btn-secondary" style="margin-top:20px" onclick="finishGenerala()">Finalizar juego manualmente</button>`
+          : `<button class="btn btn-primary" onclick="restartGenerala()">Jugar otra partida (Mismos jugadores)</button>`
+      }
       <button class="btn-link" onclick="goHome()">‹ Salir de la sala</button>
     </div>`;
-      }
-
-      async function updateGeneralaNumberCell(input) {
-        const entity = input.dataset.entity,
-          cat = input.dataset.cat,
-          mult = parseInt(input.dataset.mult);
-        let qty = parseInt(input.value);
-        if (isNaN(qty)) qty = 0;
-        qty = Math.max(0, Math.min(5, qty));
-        state.room.generala.scores[entity][cat] = qty * mult;
-        await saveRoom();
-        render();
       }
 
       async function updateGeneralaPointCell(input) {
@@ -1148,14 +1311,48 @@
           cat = input.dataset.cat;
         const raw = input.value;
         const val = parseInt(raw);
-        state.room.generala.scores[entity][cat] =
-          raw === "" || isNaN(val) ? null : val;
+
+        const g = state.room.generala;
+        const oldVal = g.scores[entity][cat];
+        const newVal = raw === "" || isNaN(val) ? null : val;
+
+        g.scores[entity][cat] = newVal;
+
+        // Si se agregó un número nuevo donde antes no había, avanza el turno automático
+        if (oldVal === null && newVal !== null) {
+          g.turn = (g.turn + 1) % g.entities.length;
+        }
+
         await saveRoom();
         render();
       }
 
       async function finishGenerala() {
         state.room.status = "finished";
+        await saveRoom();
+        render();
+      }
+
+      async function restartGenerala() {
+        const g = state.room.generala;
+        g.entities.forEach((e) => {
+          g.scores[e.id] = {
+            uno: null,
+            dos: null,
+            tres: null,
+            cuatro: null,
+            cinco: null,
+            seis: null,
+            escalera: null,
+            full: null,
+            poker: null,
+            generala: null,
+            generalaDoble: null,
+          };
+        });
+        g.startIndex = Math.floor(Math.random() * g.entities.length);
+        g.turn = g.startIndex;
+        state.room.status = "playing";
         await saveRoom();
         render();
       }
