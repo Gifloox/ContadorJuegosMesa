@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Mesa de Juego · Burako & Generala</title>
+    <title>Mesa de Juego · Anotador</title>
     <style>
       @import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500..800&family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600;700&display=swap");
 
@@ -406,6 +406,7 @@
         display: flex;
         flex-direction: column;
         justify-content: center;
+        transition: background-color 0.3s;
       }
       .total-card.winner {
         background: linear-gradient(
@@ -419,6 +420,13 @@
         color: #2a1f08;
         opacity: 0.7;
       }
+      .total-card.eliminated {
+        background: #3b1d1d;
+      }
+      .total-card.eliminated .entity-total {
+        color: #ff8a80;
+      }
+
       .entity-name {
         font-size: 0.75rem;
         text-transform: uppercase;
@@ -523,6 +531,9 @@
         color: var(--ink);
         font-size: 0.9rem;
         letter-spacing: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
       .hand-input-group input {
         margin-bottom: 0;
@@ -617,7 +628,7 @@
         background: #fff8e8;
       }
 
-      .burako-history-cell {
+      .history-cell {
         padding: 10px 8px;
         line-height: 1.3;
       }
@@ -724,9 +735,12 @@
         }
         if (r.game === "burako") {
           state.screen = r.status === "setup" ? "burako-setup" : "burako-play";
-        } else {
+        } else if (r.game === "generala") {
           state.screen =
             r.status === "setup" ? "generala-setup" : "generala-play";
+        } else if (r.game === "chinchon") {
+          state.screen =
+            r.status === "setup" ? "chinchon-setup" : "chinchon-play";
         }
       }
 
@@ -771,7 +785,7 @@
         app.innerHTML = `
     <div class="card">
       <h1>🎲 Mesa de Juego</h1>
-      <p class="subtitle">Anotador compartido para Burako y Generala</p>
+      <p class="subtitle">Anotador compartido en tiempo real</p>
       <button class="btn btn-primary" onclick="startCreate()">➕ Crear nueva sala</button>
       <div class="divider">o</div>
       <label style="margin-top:0">Unirse con código de sala</label>
@@ -831,6 +845,7 @@
       <h2 style="text-align:center">¿Qué van a jugar?</h2>
       <div class="game-options">
         <button class="game-btn" onclick="chooseGame('burako')">🃏 Burako</button>
+        <button class="game-btn" onclick="chooseGame('chinchon')">🎴 Chin Chon</button>
         <button class="game-btn" onclick="chooseGame('generala')">🎲 Generala</button>
       </div>
       <button class="btn-link" onclick="goHome()">‹ Salir de la sala</button>
@@ -848,12 +863,19 @@
             rounds: [],
             startIndex: 0,
           };
-        } else {
+        } else if (game === "generala") {
           state.room.generala = {
             entities: [],
             scores: {},
             startIndex: 0,
             turn: 0,
+          };
+        } else if (game === "chinchon") {
+          state.room.chinchon = {
+            entities: [],
+            limit: 100,
+            rounds: [],
+            startIndex: 0,
           };
         }
         await saveRoom();
@@ -861,7 +883,7 @@
         render();
       }
 
-      /* ---------- BURAKO: SETUP ---------- */
+      /* ==================== BURAKO ==================== */
       function renderBurakoSetup() {
         app.classList.remove("wide-mode");
         const b = state.room.burako;
@@ -871,8 +893,8 @@
           namesHtml = Array.from({ length: b.mode })
             .map(
               (_, i) => `
-      <input class="name-input" id="bname-${i}" placeholder="${i + 1}° Jugador ${i === 0 ? "(Empieza)" : ""}" value="${(b.entities[i] && b.entities[i].name) || ""}" />
-    `,
+            <input class="name-input" id="bname-${i}" placeholder="${i + 1}° Jugador ${i === 0 ? "(Empieza)" : ""}" value="${(b.entities[i] && b.entities[i].name) || ""}" />
+          `,
             )
             .join("");
         } else if (b.mode === 4) {
@@ -955,23 +977,19 @@
         } else {
           b.entities.forEach((e, i) => {
             const el = document.getElementById("bname-" + i);
-            const val = el ? el.value.trim() : "";
-            e.name = val || "Jugador " + (i + 1);
+            e.name = (el ? el.value.trim() : "") || "Jugador " + (i + 1);
           });
         }
-
         const limitVal = parseInt(document.getElementById("blimit").value);
         b.limit = isNaN(limitVal) ? 3000 : limitVal;
         b.rounds = [];
-        b.startIndex = 0; // Se fuerza a que empiece el que pusieron primero
+        b.startIndex = 0;
         state.room.status = "playing";
-
         await saveRoom();
         state.screen = "burako-play";
         render();
       }
 
-      /* ---------- BURAKO: JUGAR ---------- */
       function computeBurakoTotals() {
         const b = state.room.burako;
         const totals = {};
@@ -1036,29 +1054,27 @@
             const diff = maxTotal - t;
             let diffHtml = "";
             if (maxTotal > 0) {
-              if (diff > 0) {
+              if (diff > 0)
                 diffHtml = `<div class="entity-diff">a ${diff} pts</div>`;
-              } else {
-                diffHtml = `<div class="entity-diff leader">Líder</div>`;
-              }
+              else diffHtml = `<div class="entity-diff leader">Líder</div>`;
             }
-            return `
-    <div class="total-card ${finished && t === maxTotal ? "winner" : ""}">
-      <div class="entity-name">${e.name}</div>
-      <div class="entity-total">${t}</div>
-      ${diffHtml}
-    </div>`;
+            return `<div class="total-card ${finished && t === maxTotal ? "winner" : ""}">
+            <div class="entity-name">${e.name}</div>
+            <div class="entity-total">${t}</div>
+            ${diffHtml}
+          </div>`;
           })
           .join("");
 
         const formInputs = b.entities
           .map(
             (e) => `
-    <div class="hand-input-group">
-      <label>${e.name}</label>
-      <input type="number" id="base-${e.id}" placeholder="Base" oninput="checkBurakoInputs()" />
-      <input type="number" id="mesa-${e.id}" placeholder="Mesa" oninput="checkBurakoInputs()" />
-    </div>`,
+          <div class="hand-input-group">
+            <label>${e.name}</label>
+            <input type="number" id="base-${e.id}" placeholder="Base" oninput="checkBurakoInputs()" />
+            <input type="number" id="mesa-${e.id}" placeholder="Mesa" oninput="checkBurakoInputs()" />
+          </div>
+        `,
           )
           .join("");
 
@@ -1074,11 +1090,11 @@
               const base = r.values[e.id] ? r.values[e.id].base : 0;
               const mesa = r.values[e.id] ? r.values[e.id].mesa : 0;
               const t = r.values[e.id] ? r.values[e.id].total : 0;
-              return `<td class="burako-history-cell">
-                <div style="font-weight: 700; font-size: 1.05rem; color: ${t < 0 ? "var(--red)" : "var(--ink)"}">${t > 0 ? "+" : ""}${t}</div>
-                <div class="muted" style="font-size: 0.7rem;">B: ${base} | M: ${mesa}</div>
-                <div style="font-size: 0.8rem; margin-top: 4px; color: var(--gold-dark); font-weight: 600;">∑ ${running[e.id]}</div>
-              </td>`;
+              return `<td class="history-cell">
+              <div style="font-weight: 700; font-size: 1.05rem; color: ${t < 0 ? "var(--red)" : "var(--ink)"}">${t > 0 ? "+" : ""}${t}</div>
+              <div class="muted" style="font-size: 0.7rem;">B: ${base} | M: ${mesa}</div>
+              <div style="font-size: 0.8rem; margin-top: 4px; color: var(--gold-dark); font-weight: 600;">∑ ${running[e.id]}</div>
+            </td>`;
             })
             .join("")}</tr>`;
         });
@@ -1092,24 +1108,24 @@
       ${
         finished
           ? `<div class="winner-banner">🏆 Gana ${winners.map((w) => w.name).join(" y ")}</div>`
-          : `<div class="turn-banner">Ronda ${b.rounds.length + 1} · Empieza / Reparte: <br><b>${currentStarterName}</b></div>`
+          : `<div class="turn-banner">Ronda ${b.rounds.length + 1} · Reparte / Empieza: <br><b>${currentStarterName}</b></div>`
       }
       
       <div class="totals-grid">${totalsCards}</div>
       ${
         !finished
           ? `
-      <div class="add-hand-section">
-        <h3>Agregar mano</h3>
-        <div class="hand-input-group" style="opacity:.6">
-          <label></label><label style="text-align:center;font-size:.75rem;text-transform:uppercase">Base</label><label style="text-align:center;font-size:.75rem;text-transform:uppercase">Mesa</label>
-        </div>
-        ${formInputs}
-        <button class="btn btn-primary" id="btn-add-hand" onclick="addBurakoHand()" disabled>Guardar mano</button>
-      </div>`
+        <div class="add-hand-section">
+          <h3>Agregar mano</h3>
+          <div class="hand-input-group" style="opacity:.6">
+            <label></label><label style="text-align:center;font-size:.75rem;text-transform:uppercase">Base</label><label style="text-align:center;font-size:.75rem;text-transform:uppercase">Mesa</label>
+          </div>
+          ${formInputs}
+          <button class="btn btn-primary" id="btn-add-hand" onclick="addBurakoHand()" disabled>Guardar mano</button>
+        </div>`
           : `
-      <button class="btn btn-primary" onclick="restartBurako()">Jugar otra partida (Mismos equipos)</button>
-          `
+        <button class="btn btn-primary" onclick="restartBurako()">Jugar otra partida (Mismos equipos)</button>
+      `
       }
       <h3>Historial de Manos</h3>
       <div class="table-scroll">
@@ -1128,7 +1144,6 @@
           btn.disabled = true;
           btn.innerHTML = '<span class="spinner"></span> Guardando...';
         }
-
         const b = state.room.burako;
         const values = {};
         for (const e of b.entities) {
@@ -1147,13 +1162,246 @@
         const b = state.room.burako;
         b.rounds = [];
         const turnCount = b.mode === 4 ? 4 : b.entities.length;
-        b.startIndex = (b.startIndex + 1) % turnCount; // Avanza al siguiente para empezar
+        b.startIndex = (b.startIndex + 1) % turnCount;
         state.room.status = "playing";
         await saveRoom();
         render();
       }
 
-      /* ---------- GENERALA: SETUP ---------- */
+      /* ==================== CHIN CHON ==================== */
+      function renderChinchonSetup() {
+        app.classList.remove("wide-mode");
+        const c = state.room.chinchon;
+        if (!c.entities.length) {
+          c.entities = [
+            { id: "p0", name: "" },
+            { id: "p1", name: "" },
+          ];
+        }
+        const count = c.entities.length;
+        const namesHtml = c.entities
+          .map(
+            (e, i) => `
+          <input class="name-input" id="cname-${i}" placeholder="${i + 1}° Jugador ${i === 0 ? "(Empieza)" : ""}" value="${e.name || ""}" />
+        `,
+          )
+          .join("");
+
+        app.innerHTML = `
+    <div class="card">
+      <div class="room-code-badge">Sala <b>${state.code}</b> <button class="copy-btn" onclick="copyCode()">📋</button></div>
+      <h2>🎴 Configurar Chin Chon</h2>
+      <label style="margin-top:6px">Cantidad de jugadores (2 a 8)</label>
+      <div class="count-stepper">
+        <button class="btn-round" onclick="changeChinchonCount(-1)">−</button>
+        <span class="count-display">${count}</span>
+        <button class="btn-round" onclick="changeChinchonCount(1)">+</button>
+      </div>
+      <div class="names-section">
+        <label style="color: var(--ink-soft); font-size: 0.8rem;">Nombres (en orden de juego. El 1° empieza)</label>
+        ${namesHtml}
+      </div>
+      <label>Puntaje límite para perder (ej: 100)</label>
+      <input type="number" id="climit" value="${c.limit || 100}" />
+      <button class="btn btn-primary" onclick="startChinchonGame()">Comenzar partida</button>
+      <button class="btn-link" onclick="goHome()">‹ Salir de la sala</button>
+    </div>`;
+      }
+
+      async function changeChinchonCount(delta) {
+        const c = state.room.chinchon;
+        c.entities.forEach((e, i) => {
+          const el = document.getElementById("cname-" + i);
+          if (el) e.name = el.value;
+        });
+        let count = Math.max(2, Math.min(8, c.entities.length + delta));
+        c.entities = Array.from({ length: count }).map(
+          (_, i) => c.entities[i] || { id: "p" + i, name: "" },
+        );
+        await saveRoom();
+        render();
+      }
+
+      async function startChinchonGame() {
+        const c = state.room.chinchon;
+        c.entities.forEach((e, i) => {
+          const el = document.getElementById("cname-" + i);
+          e.name = (el ? el.value.trim() : "") || "Jugador " + (i + 1);
+        });
+        const limitVal = parseInt(document.getElementById("climit").value);
+        c.limit = isNaN(limitVal) ? 100 : limitVal;
+        c.rounds = [];
+        c.startIndex = 0;
+        state.room.status = "playing";
+        await saveRoom();
+        state.screen = "chinchon-play";
+        render();
+      }
+
+      function computeChinchonTotals() {
+        const c = state.room.chinchon;
+        const totals = {};
+        c.entities.forEach((e) => (totals[e.id] = 0));
+        c.rounds.forEach((r) => {
+          c.entities.forEach((e) => {
+            totals[e.id] += r.values[e.id] || 0;
+          });
+        });
+        return totals;
+      }
+
+      window.checkChinchonInputs = function () {
+        const c = state.room.chinchon;
+        let allFilled = true;
+        for (const e of c.entities) {
+          const ptEl = document.getElementById("cpts-" + e.id);
+          if (!ptEl || ptEl.value === "") {
+            allFilled = false;
+            break;
+          }
+        }
+        const btn = document.getElementById("btn-add-chand");
+        if (btn) btn.disabled = !allFilled;
+      };
+
+      function renderChinchonPlay() {
+        app.classList.remove("wide-mode");
+        const c = state.room.chinchon;
+        const totals = computeChinchonTotals();
+        const finished = state.room.status === "finished";
+
+        // En Chinchón gana el que tiene MENOS puntos.
+        const values = Object.values(totals);
+        const minTotal = values.length ? Math.min(...values) : 0;
+        const winners = finished
+          ? c.entities.filter((e) => totals[e.id] === minTotal)
+          : [];
+
+        const turnIndex = (c.startIndex + c.rounds.length) % c.entities.length;
+        const currentStarterName = c.entities[turnIndex].name;
+
+        const totalsCards = c.entities
+          .map((e) => {
+            const t = totals[e.id];
+            const isEliminated = t >= c.limit;
+            let diffHtml = "";
+
+            if (!isEliminated) {
+              if (t > minTotal)
+                diffHtml = `<div class="entity-diff">a ${t - minTotal} pts</div>`;
+              else diffHtml = `<div class="entity-diff leader">Líder</div>`;
+            } else {
+              diffHtml = `<div class="entity-diff" style="color:#ff8a80">Eliminado</div>`;
+            }
+
+            return `<div class="total-card ${isEliminated ? "eliminated" : ""} ${finished && t === minTotal ? "winner" : ""}">
+            <div class="entity-name">${e.name}</div>
+            <div class="entity-total">${t}</div>
+            ${diffHtml}
+          </div>`;
+          })
+          .join("");
+
+        const formInputs = c.entities
+          .map(
+            (e) => `
+          <div class="hand-input-group" style="grid-template-columns: 1fr 120px;">
+            <label>${e.name}</label>
+            <input type="number" id="cpts-${e.id}" placeholder="Puntos" oninput="checkChinchonInputs()" />
+          </div>
+        `,
+          )
+          .join("");
+
+        let historyRows = "";
+        let running = {};
+        c.entities.forEach((e) => (running[e.id] = 0));
+        c.rounds.forEach((r, idx) => {
+          c.entities.forEach((e) => {
+            running[e.id] += r.values[e.id] || 0;
+          });
+          historyRows += `<tr><td>Ronda ${idx + 1}</td>${c.entities
+            .map((e) => {
+              const val = r.values[e.id] || 0;
+              return `<td class="history-cell">
+              <div style="font-weight: 700; font-size: 1.05rem; color: ${val < 0 ? "var(--green-ok)" : "var(--ink)"}">${val > 0 ? "+" : ""}${val}</div>
+              <div style="font-size: 0.8rem; margin-top: 4px; color: var(--gold-dark); font-weight: 600;">∑ ${running[e.id]}</div>
+            </td>`;
+            })
+            .join("")}</tr>`;
+        });
+
+        app.innerHTML = `
+    <div class="card">
+      <div class="room-code-badge">Sala <b>${state.code}</b> <button class="copy-btn" onclick="copyCode()">📋</button></div>
+      <h2>🎴 Chin Chon ${finished ? "· Terminado" : ""}</h2>
+      <div class="limit-info">Límite para perder: <b>${c.limit}</b></div>
+      
+      ${
+        finished
+          ? `<div class="winner-banner">🏆 Gana ${winners.map((w) => w.name).join(" y ")}</div>`
+          : `<div class="turn-banner">Ronda ${c.rounds.length + 1} · Reparte: <br><b>${currentStarterName}</b></div>`
+      }
+      
+      <div class="totals-grid">${totalsCards}</div>
+      ${
+        !finished
+          ? `
+        <div class="add-hand-section">
+          <h3>Puntos de la ronda</h3>
+          ${formInputs}
+          <button class="btn btn-primary" id="btn-add-chand" onclick="addChinchonHand()" disabled>Guardar mano</button>
+        </div>`
+          : `
+        <button class="btn btn-primary" onclick="restartChinchon()">Jugar otra partida (Mismos jugadores)</button>
+      `
+      }
+      ${!finished && c.rounds.length > 0 ? `<button class="btn btn-secondary" style="margin-top:20px" onclick="finishChinchon()">Finalizar juego manualmente</button>` : ""}
+      
+      <h3>Historial</h3>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th></th>${c.entities.map((e) => `<th>${e.name}</th>`).join("")}</tr></thead>
+          <tbody>${historyRows || '<tr><td colspan="' + (c.entities.length + 1) + '" class="muted">Todavía no hay rondas jugadas</td></tr>'}</tbody>
+        </table>
+      </div>
+      <button class="btn-link" onclick="goHome()">‹ Salir de la sala</button>
+    </div>`;
+      }
+
+      async function addChinchonHand() {
+        const btn = document.getElementById("btn-add-chand");
+        if (btn) {
+          btn.disabled = true;
+          btn.innerHTML = '<span class="spinner"></span> Guardando...';
+        }
+        const c = state.room.chinchon;
+        const values = {};
+        for (const e of c.entities) {
+          const ptEl = document.getElementById("cpts-" + e.id);
+          values[e.id] = parseInt(ptEl.value) || 0;
+        }
+        c.rounds.push({ values });
+        await saveRoom();
+        render();
+      }
+
+      async function finishChinchon() {
+        state.room.status = "finished";
+        await saveRoom();
+        render();
+      }
+
+      async function restartChinchon() {
+        const c = state.room.chinchon;
+        c.rounds = [];
+        c.startIndex = (c.startIndex + 1) % c.entities.length;
+        state.room.status = "playing";
+        await saveRoom();
+        render();
+      }
+
+      /* ==================== GENERALA ==================== */
       function renderGeneralaSetup() {
         app.classList.remove("wide-mode");
         const g = state.room.generala;
@@ -1167,10 +1415,11 @@
         const namesHtml = g.entities
           .map(
             (e, i) => `
-    <input class="name-input" id="gname-${i}" placeholder="${i + 1}° Jugador ${i === 0 ? "(Empieza)" : ""}" value="${e.name || ""}" />
-  `,
+          <input class="name-input" id="gname-${i}" placeholder="${i + 1}° Jugador ${i === 0 ? "(Empieza)" : ""}" value="${e.name || ""}" />
+        `,
           )
           .join("");
+
         app.innerHTML = `
     <div class="card">
       <div class="room-code-badge">Sala <b>${state.code}</b> <button class="copy-btn" onclick="copyCode()">📋</button></div>
@@ -1197,10 +1446,9 @@
           if (el) e.name = el.value;
         });
         let count = Math.max(2, Math.min(10, g.entities.length + delta));
-        const newEntities = Array.from({ length: count }).map(
+        g.entities = Array.from({ length: count }).map(
           (_, i) => g.entities[i] || { id: "p" + i, name: "" },
         );
-        g.entities = newEntities;
         await saveRoom();
         render();
       }
@@ -1209,8 +1457,7 @@
         const g = state.room.generala;
         g.entities.forEach((e, i) => {
           const el = document.getElementById("gname-" + i);
-          const val = el ? el.value.trim() : "";
-          e.name = val || "Jugador " + (i + 1);
+          e.name = (el ? el.value.trim() : "") || "Jugador " + (i + 1);
         });
         g.scores = {};
         g.entities.forEach((e) => {
@@ -1228,17 +1475,14 @@
             generalaDoble: null,
           };
         });
-
-        g.startIndex = 0; // Se fuerza a que empiece el que escribieron primero
+        g.startIndex = 0;
         g.turn = g.startIndex;
         state.room.status = "playing";
-
         await saveRoom();
         state.screen = "generala-play";
         render();
       }
 
-      /* ---------- GENERALA: JUGAR ---------- */
       function computeGeneralaTotal(g, entityId) {
         const s = g.scores[entityId];
         let total = 0;
@@ -1258,13 +1502,11 @@
 
       window.endGeneralaTurn = async function (e) {
         if (e) e.preventDefault();
-
         const btn = e ? e.currentTarget : null;
         if (btn) {
           btn.innerHTML = '<span class="spinner"></span> Procesando...';
           btn.style.pointerEvents = "none";
         }
-
         if (
           document.activeElement &&
           document.activeElement.tagName === "INPUT"
@@ -1272,7 +1514,6 @@
           document.activeElement.blur();
           await new Promise((r) => setTimeout(r, 150));
         }
-
         const g = state.room.generala;
         g.turn = (g.turn + 1) % g.entities.length;
         await saveRoom();
@@ -1299,12 +1540,12 @@
                   const filledClass = isFilled ? "filled" : "";
 
                   return `<td class="${lockedClass}">
-        <input type="number" class="cell-input ${filledClass}" ${disabled}
-          data-entity="${e.id}" data-cat="${cat.key}"
-          value="${isFilled ? val : ""}" 
-          placeholder="${cat.hint || "ej: " + cat.n * 3}"
-          onchange="updateGeneralaPointCell(this)" />
-      </td>`;
+              <input type="number" class="cell-input ${filledClass}" ${disabled}
+                data-entity="${e.id}" data-cat="${cat.key}"
+                value="${isFilled ? val : ""}" 
+                placeholder="${cat.hint || "ej: " + cat.n * 3}"
+                onchange="updateGeneralaPointCell(this)" />
+            </td>`;
                 })
                 .join("");
               return `<tr><td>${cat.label}</td>${cells}</tr>`;
@@ -1381,10 +1622,8 @@
           cat = input.dataset.cat;
         const raw = input.value;
         const val = parseInt(raw);
-
-        const g = state.room.generala;
-        g.scores[entity][cat] = raw === "" || isNaN(val) ? null : val;
-
+        state.room.generala.scores[entity][cat] =
+          raw === "" || isNaN(val) ? null : val;
         await saveRoom();
         render();
       }
@@ -1412,7 +1651,7 @@
             generalaDoble: null,
           };
         });
-        g.startIndex = (g.startIndex + 1) % g.entities.length; // Avanza al siguiente para empezar
+        g.startIndex = (g.startIndex + 1) % g.entities.length;
         g.turn = g.startIndex;
         state.room.status = "playing";
         await saveRoom();
@@ -1421,7 +1660,6 @@
 
       /* ---------- Render dispatcher ---------- */
       function render() {
-        // Guardar posiciones de scroll
         const scrollEl = document.querySelector(".table-scroll");
         const savedTableScroll = scrollEl ? scrollEl.scrollLeft : 0;
         const savedWindowScroll =
@@ -1446,11 +1684,16 @@
           case "generala-play":
             renderGeneralaPlay();
             break;
+          case "chinchon-setup":
+            renderChinchonSetup();
+            break;
+          case "chinchon-play":
+            renderChinchonPlay();
+            break;
           default:
             renderHome();
         }
 
-        // Restaurar posiciones de scroll
         const newScrollEl = document.querySelector(".table-scroll");
         if (newScrollEl && savedTableScroll > 0) {
           newScrollEl.scrollLeft = savedTableScroll;
