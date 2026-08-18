@@ -471,9 +471,9 @@
         margin: 14px 0 0;
       }
       .turn-controls .btn-icon {
-        background: rgba(255, 255, 255, 0.15);
+        background: rgba(255, 255, 255, 0.1);
         border: none;
-        color: white;
+        color: rgba(255, 255, 255, 0.6);
         border-radius: 8px;
         width: 32px;
         height: 32px;
@@ -482,9 +482,13 @@
         justify-content: center;
         font-size: 1.2rem;
         cursor: pointer;
+        transition:
+          background 0.2s,
+          color 0.2s;
       }
       .turn-controls .btn-icon:hover {
         background: rgba(255, 255, 255, 0.3);
+        color: white;
       }
       .winner-banner {
         background: linear-gradient(
@@ -1246,6 +1250,31 @@
         render();
       };
 
+      window.endGeneralaTurn = async function (e) {
+        if (e) e.preventDefault(); // Evita que se pierda el foco erróneamente en el input
+
+        const btn = e ? e.currentTarget : null;
+        if (btn) {
+          btn.innerHTML = '<span class="spinner"></span> Procesando...';
+          btn.style.pointerEvents = "none"; // Evitar el doble toque
+        }
+
+        // Si el usuario estaba escribiendo un puntaje, forzamos que se guarde antes de pasar el turno
+        if (
+          document.activeElement &&
+          document.activeElement.tagName === "INPUT"
+        ) {
+          document.activeElement.blur();
+          // Esperar un instante para que el evento onchange (updateGeneralaPointCell) termine
+          await new Promise((r) => setTimeout(r, 150));
+        }
+
+        const g = state.room.generala;
+        g.turn = (g.turn + 1) % g.entities.length;
+        await saveRoom();
+        render();
+      };
+
       function renderGeneralaPlay() {
         app.classList.add("wide-mode");
         const g = state.room.generala;
@@ -1314,10 +1343,13 @@
         finished
           ? `<div class="winner-banner">🏆 Gana ${winners.map((w) => w.name).join(" y ")}</div>`
           : `
-        <div class="turn-controls">
-          <button class="btn-icon" onclick="changeGeneralaTurn(-1)" title="Retroceder turno">‹</button>
-          <div>Le toca jugar a: <b>${g.entities[g.turn].name}</b></div>
-          <button class="btn-icon" onclick="changeGeneralaTurn(1)" title="Avanzar turno">›</button>
+        <div class="turn-controls" style="flex-direction: column; gap: 12px; padding: 14px 16px;">
+          <div style="display: flex; align-items: center; justify-content: center; gap: 12px; font-size: 1.05rem;">
+            <button class="btn-icon" onclick="changeGeneralaTurn(-1)" title="Corregir (retroceder)" style="width:28px; height:28px; font-size:1.1rem;">‹</button>
+            <div>Turno de: <b style="color: var(--gold);">${g.entities[g.turn].name}</b></div>
+            <button class="btn-icon" onclick="changeGeneralaTurn(1)" title="Corregir (avanzar)" style="width:28px; height:28px; font-size:1.1rem;">›</button>
+          </div>
+          <button class="btn btn-primary" style="margin-top: 0;" onpointerdown="endGeneralaTurn(event)">Terminar turno de ${g.entities[g.turn].name}</button>
         </div>`
       }
       
@@ -1347,14 +1379,7 @@
         const val = parseInt(raw);
 
         const g = state.room.generala;
-        const oldVal = g.scores[entity][cat];
-        const newVal = raw === "" || isNaN(val) ? null : val;
-
-        g.scores[entity][cat] = newVal;
-
-        if (oldVal === null && newVal !== null) {
-          g.turn = (g.turn + 1) % g.entities.length;
-        }
+        g.scores[entity][cat] = raw === "" || isNaN(val) ? null : val;
 
         await saveRoom();
         render();
