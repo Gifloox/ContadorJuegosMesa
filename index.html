@@ -741,6 +741,8 @@
         } else if (r.game === "chinchon") {
           state.screen =
             r.status === "setup" ? "chinchon-setup" : "chinchon-play";
+        } else if (r.game === "truco") {
+          state.screen = r.status === "setup" ? "truco-setup" : "truco-play";
         }
       }
 
@@ -777,6 +779,61 @@
         if (navigator.clipboard) {
           navigator.clipboard.writeText(text).catch(() => {});
         }
+      }
+
+      /* ---------- Fósforos para Truco ---------- */
+      function getMatchBoxSvg(count) {
+        const activeColor = "#d6985c"; // madera fosforo
+        const headColor = "#d93829"; // cabeza roja
+        const idleColor = "rgba(0,0,0,0.06)";
+
+        const lines = [
+          { x1: 12, y1: 10, x2: 12, y2: 40, hx: 12, hy: 10 }, // Izq
+          { x1: 12, y1: 40, x2: 40, y2: 40, hx: 40, hy: 40 }, // Abajo
+          { x1: 40, y1: 40, x2: 40, y2: 10, hx: 40, hy: 10 }, // Der
+          { x1: 40, y1: 10, x2: 12, y2: 10, hx: 15, hy: 10 }, // Arriba
+          { x1: 12, y1: 10, x2: 40, y2: 40, hx: 37, hy: 37 }, // Diagonal
+        ];
+
+        let svg = `<svg width="52" height="52" viewBox="0 0 52 52">`;
+        for (let i = 0; i < 5; i++) {
+          const isActive = i < count;
+          const color = isActive ? activeColor : idleColor;
+          const width = isActive ? 4 : 2;
+          svg += `<line x1="${lines[i].x1}" y1="${lines[i].y1}" x2="${lines[i].x2}" y2="${lines[i].y2}" stroke="${color}" stroke-width="${width}" stroke-linecap="round" />`;
+          if (isActive) {
+            svg += `<circle cx="${lines[i].hx}" cy="${lines[i].hy}" r="3" fill="${headColor}" />`;
+          }
+        }
+        svg += `</svg>`;
+        return svg;
+      }
+
+      function renderTrucoScoreVisual(score, limit) {
+        let html =
+          '<div style="display:flex; flex-direction:column; gap:16px; align-items:center; min-height: 160px;">';
+
+        const renderSection = (title, start, end) => {
+          let sectionHtml = `<div style="text-align:center; width: 100%;">
+            <div style="font-size:0.75rem; color:var(--ink-soft); text-transform:uppercase; font-weight:700; margin-bottom:6px; letter-spacing:0.05em;">${title}</div>
+            <div style="display:flex; gap:6px; justify-content:center;">`;
+          for (let i = start; i < end; i += 5) {
+            const boxScore = Math.max(0, Math.min(5, score - i));
+            sectionHtml += getMatchBoxSvg(boxScore);
+          }
+          sectionHtml += "</div></div>";
+          return sectionHtml;
+        };
+
+        if (limit === 30) {
+          html += renderSection("Malas", 0, 15);
+          html += renderSection("Buenas", 15, 30);
+        } else {
+          html += renderSection("Puntos", 0, limit);
+        }
+
+        html += "</div>";
+        return html;
       }
 
       /* ---------- HOME ---------- */
@@ -844,6 +901,7 @@
       <div class="room-code-badge">Sala <b>${state.code}</b> <button class="copy-btn" onclick="copyCode()" title="Copiar código">📋</button></div>
       <h2 style="text-align:center">¿Qué van a jugar?</h2>
       <div class="game-options">
+        <button class="game-btn" onclick="chooseGame('truco')">🧉 Truco</button>
         <button class="game-btn" onclick="chooseGame('burako')">🃏 Burako</button>
         <button class="game-btn" onclick="chooseGame('chinchon')">🎴 Chin Chon</button>
         <button class="game-btn" onclick="chooseGame('generala')">🎲 Generala</button>
@@ -877,10 +935,152 @@
             rounds: [],
             startIndex: 0,
           };
+        } else if (game === "truco") {
+          state.room.truco = {
+            entities: [
+              { id: "N", name: "Nosotros", score: 0 },
+              { id: "E", name: "Ellos", score: 0 },
+            ],
+            limit: 30,
+          };
         }
         await saveRoom();
         state.screen = game + "-setup";
         render();
+      }
+
+      /* ==================== TRUCO ==================== */
+      function renderTrucoSetup() {
+        app.classList.remove("wide-mode");
+        const t = state.room.truco;
+
+        app.innerHTML = `
+    <div class="card">
+      <div class="room-code-badge">Sala <b>${state.code}</b> <button class="copy-btn" onclick="copyCode()">📋</button></div>
+      <h2>🧉 Configurar Truco</h2>
+      
+      <div class="names-section">
+        <label>Equipos / Jugadores</label>
+        <input class="name-input" id="tname-0" placeholder="Nosotros" value="${t.entities[0].name}" />
+        <input class="name-input" id="tname-1" placeholder="Ellos" value="${t.entities[1].name}" />
+      </div>
+
+      <label style="margin-top:16px;">¿A cuántos puntos?</label>
+      <div class="mode-options">
+        <button class="mode-btn ${t.limit === 15 ? "active" : ""}" onclick="setTrucoLimit(15)">A 15 puntos (Corto)</button>
+        <button class="mode-btn ${t.limit === 30 ? "active" : ""}" onclick="setTrucoLimit(30)">A 30 puntos (Largo)</button>
+      </div>
+
+      <button class="btn btn-primary" onclick="startTrucoGame()">Comenzar partida</button>
+      <button class="btn-link" onclick="goHome()">‹ Salir de la sala</button>
+    </div>`;
+      }
+
+      async function setTrucoLimit(limit) {
+        const t = state.room.truco;
+        t.limit = limit;
+        const name0 = document.getElementById("tname-0");
+        const name1 = document.getElementById("tname-1");
+        if (name0) t.entities[0].name = name0.value || "Nosotros";
+        if (name1) t.entities[1].name = name1.value || "Ellos";
+        await saveRoom();
+        render();
+      }
+
+      async function startTrucoGame() {
+        const t = state.room.truco;
+        const name0 = document.getElementById("tname-0");
+        const name1 = document.getElementById("tname-1");
+        t.entities[0].name = (name0 ? name0.value.trim() : "") || "Nosotros";
+        t.entities[1].name = (name1 ? name1.value.trim() : "") || "Ellos";
+        t.entities[0].score = 0;
+        t.entities[1].score = 0;
+
+        state.room.status = "playing";
+        await saveRoom();
+        state.screen = "truco-play";
+        render();
+      }
+
+      window.updateTrucoScore = async function (entityId, delta) {
+        const t = state.room.truco;
+        const entity = t.entities.find((e) => e.id === entityId);
+        if (entity) {
+          entity.score = Math.max(0, Math.min(t.limit, entity.score + delta));
+          if (t.entities.some((e) => e.score >= t.limit)) {
+            state.room.status = "finished";
+          }
+          await saveRoom();
+          render();
+        }
+      };
+
+      async function restartTruco() {
+        const t = state.room.truco;
+        t.entities[0].score = 0;
+        t.entities[1].score = 0;
+        state.room.status = "playing";
+        await saveRoom();
+        render();
+      }
+
+      function renderTrucoPlay() {
+        app.classList.remove("wide-mode");
+        const t = state.room.truco;
+        const finished =
+          state.room.status === "finished" ||
+          t.entities.some((e) => e.score >= t.limit);
+
+        const teamsHtml = t.entities
+          .map((e) => {
+            const isWinner = finished && e.score >= t.limit;
+            return `
+          <div style="flex: 1; display:flex; flex-direction:column; align-items:center; background:var(--parchment-dim); padding:18px 12px; border-radius:16px; position:relative; overflow:hidden;">
+            ${isWinner ? `<div style="position:absolute; top:0; left:0; right:0; background:var(--gold); color:#2a1f08; text-align:center; font-size:0.8rem; font-weight:700; padding:6px 0; font-family:'Inter',sans-serif; letter-spacing:0.05em;">GANADOR</div>` : ""}
+            
+            <div class="entity-name" style="margin-top: ${isWinner ? "18px" : "0"}; font-size: 1.1rem; color:var(--ink); font-weight:700;">${e.name}</div>
+            <div class="entity-total" style="font-size: 3rem; line-height:1; margin: 4px 0 16px;">${e.score}</div>
+            
+            <div style="margin-bottom: 24px; width:100%;">
+              ${renderTrucoScoreVisual(e.score, t.limit)}
+            </div>
+            
+            ${
+              !finished
+                ? `
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px; width:100%;">
+              <button class="btn btn-secondary" style="padding:10px 0; font-size:1.2rem; margin-top:0;" onclick="updateTrucoScore('${e.id}', 1)">+1</button>
+              <button class="btn btn-secondary" style="padding:10px 0; font-size:1.2rem; margin-top:0;" onclick="updateTrucoScore('${e.id}', 2)">+2</button>
+              <button class="btn btn-secondary" style="padding:10px 0; font-size:1.2rem; margin-top:0; grid-column: span 2;" onclick="updateTrucoScore('${e.id}', 3)">+3</button>
+              <button class="btn" style="background:rgba(0,0,0,0.06); color:var(--ink-soft); padding:10px 0; font-size:1.2rem; margin-top:0; grid-column: span 2;" onclick="updateTrucoScore('${e.id}', -1)">-1</button>
+            </div>
+            `
+                : ""
+            }
+          </div>
+        `;
+          })
+          .join("");
+
+        app.innerHTML = `
+        <div class="card">
+          <div class="room-code-badge">Sala <b>${state.code}</b> <button class="copy-btn" onclick="copyCode()">📋</button></div>
+          <h2>🧉 Truco ${finished ? "· Terminado" : ""}</h2>
+          <div class="limit-info">A ${t.limit} puntos</div>
+          
+          <div style="display:flex; gap:12px; margin-top: 20px;">
+            ${teamsHtml}
+          </div>
+          
+          ${
+            finished
+              ? `
+            <button class="btn btn-primary" style="margin-top:24px;" onclick="restartTruco()">Jugar la revancha</button>
+          `
+              : ""
+          }
+          <button class="btn-link" onclick="goHome()">‹ Salir de la sala</button>
+        </div>`;
       }
 
       /* ==================== BURAKO ==================== */
@@ -990,18 +1190,6 @@
         render();
       }
 
-      function computeBurakoTotals() {
-        const b = state.room.burako;
-        const totals = {};
-        b.entities.forEach((e) => (totals[e.id] = 0));
-        b.rounds.forEach((r) => {
-          b.entities.forEach((e) => {
-            totals[e.id] += r.values[e.id] ? r.values[e.id].total : 0;
-          });
-        });
-        return totals;
-      }
-
       window.checkBurakoInputs = function () {
         const b = state.room.burako;
         let allFilled = true;
@@ -1021,6 +1209,18 @@
         const btn = document.getElementById("btn-add-hand");
         if (btn) btn.disabled = !allFilled;
       };
+
+      function computeBurakoTotals() {
+        const b = state.room.burako;
+        const totals = {};
+        b.entities.forEach((e) => (totals[e.id] = 0));
+        b.rounds.forEach((r) => {
+          b.entities.forEach((e) => {
+            totals[e.id] += r.values[e.id] ? r.values[e.id].total : 0;
+          });
+        });
+        return totals;
+      }
 
       function renderBurakoPlay() {
         app.classList.remove("wide-mode");
@@ -1270,7 +1470,6 @@
         const totals = computeChinchonTotals();
         const finished = state.room.status === "finished";
 
-        // En Chinchón gana el que tiene MENOS puntos.
         const values = Object.values(totals);
         const minTotal = values.length ? Math.min(...values) : 0;
         const winners = finished
@@ -1671,6 +1870,12 @@
             break;
           case "choose-game":
             renderChooseGame();
+            break;
+          case "truco-setup":
+            renderTrucoSetup();
+            break;
+          case "truco-play":
+            renderTrucoPlay();
             break;
           case "burako-setup":
             renderBurakoSetup();
