@@ -587,10 +587,10 @@
       /* Clase para bloquear visualmente los casilleros en la Generala */
       table td.locked-col {
         background: rgba(0, 0, 0, 0.04);
-        opacity: 0.5;
+        opacity: 0.45;
       }
       table th.locked-col {
-        opacity: 0.5;
+        opacity: 0.45;
       }
       table td.locked-col input {
         background: transparent;
@@ -679,9 +679,6 @@
         screen: "home",
         pollTimer: null,
       };
-
-      // Controla cuál fue el único casillero modificado en este turno (Generala)
-      window.currentTurnActiveCat = null;
 
       const app = document.getElementById("app");
 
@@ -776,7 +773,6 @@
       function goHome() {
         stopPolling();
         state = { code: null, room: null, screen: "home", pollTimer: null };
-        window.currentTurnActiveCat = null;
         syncUrl();
         render();
       }
@@ -786,7 +782,7 @@
         state.pollTimer = setInterval(async () => {
           if (!state.code) return;
           const active = document.activeElement;
-          if (active && active.tagName === "INPUT") return;
+          if (active && active.tagName === "INPUT") return; // No interrumpe mientras tipean
           const fresh = await loadRoom(state.code);
           if (fresh) {
             state.room = fresh;
@@ -816,11 +812,11 @@
         const idleColor = "rgba(0,0,0,0.06)";
 
         const lines = [
-          { x1: 12, y1: 10, x2: 12, y2: 40, hx: 12, hy: 10 },
-          { x1: 12, y1: 40, x2: 40, y2: 40, hx: 40, hy: 40 },
-          { x1: 40, y1: 40, x2: 40, y2: 10, hx: 40, hy: 10 },
-          { x1: 40, y1: 10, x2: 12, y2: 10, hx: 15, hy: 10 },
-          { x1: 12, y1: 10, x2: 40, y2: 40, hx: 37, hy: 37 },
+          { x1: 12, y1: 10, x2: 12, y2: 40, hx: 12, hy: 10 }, // Izq
+          { x1: 12, y1: 40, x2: 40, y2: 40, hx: 40, hy: 40 }, // Abajo
+          { x1: 40, y1: 40, x2: 40, y2: 10, hx: 40, hy: 10 }, // Der
+          { x1: 40, y1: 10, x2: 12, y2: 10, hx: 15, hy: 10 }, // Arriba
+          { x1: 12, y1: 10, x2: 40, y2: 40, hx: 37, hy: 37 }, // Diagonal
         ];
 
         let svg = `<svg width="52" height="52" viewBox="0 0 52 52">`;
@@ -940,7 +936,6 @@
 
       async function chooseGame(game) {
         state.room.game = game;
-        window.currentTurnActiveCat = null;
         if (game === "burako") {
           state.room.burako = {
             mode: null,
@@ -956,6 +951,7 @@
             scores: {},
             startIndex: 0,
             turn: 0,
+            turnActiveCat: null, // Guarda la categoría completada en el turno actual
           };
         } else if (game === "chinchon") {
           state.room.chinchon = {
@@ -1705,6 +1701,7 @@
         });
         g.startIndex = 0;
         g.turn = g.startIndex;
+        g.turnActiveCat = null;
         window.currentTurnActiveCat = null;
         state.room.status = "playing";
         await saveRoom();
@@ -1725,6 +1722,7 @@
         const g = state.room.generala;
         const len = g.entities.length;
         g.turn = (g.turn + delta + len) % len;
+        g.turnActiveCat = null;
         window.currentTurnActiveCat = null;
         await saveRoom();
         render();
@@ -1746,9 +1744,40 @@
         }
         const g = state.room.generala;
         g.turn = (g.turn + 1) % g.entities.length;
+        g.turnActiveCat = null;
         window.currentTurnActiveCat = null;
         await saveRoom();
         render();
+      };
+
+      // Control visual instántaneo para bloquear campos vacios mientras se edita uno
+      window.handleGeneralaInputVisuals = function (input) {
+        const entity = input.dataset.entity;
+        const g = state.room.generala;
+
+        // Solo bloquear si es el jugador del turno actual
+        if (g.entities[g.turn].id !== entity) return;
+
+        const hasValue = input.value !== "";
+        const allInputs = document.querySelectorAll(
+          `input.cell-input[data-entity="${entity}"]`,
+        );
+
+        allInputs.forEach((el) => {
+          if (el === input) {
+            el.parentElement.classList.remove("locked-col");
+          } else {
+            // Chequear si el campo estaba originalmente vacio en la base de datos
+            const isOriginallyEmpty = g.scores[entity][el.dataset.cat] === null;
+            if (isOriginallyEmpty) {
+              if (hasValue) {
+                el.parentElement.classList.add("locked-col");
+              } else {
+                el.parentElement.classList.remove("locked-col");
+              }
+            }
+          }
+        });
       };
 
       // Función que fuerza a que el número ingresado sea válido para esa categoría
@@ -1793,9 +1822,10 @@
                   // Bloquea visualmente los campos vacíos de esta ronda si ya se anotó otro campo
                   const isLockedThisTurn =
                     isTurn &&
-                    window.currentTurnActiveCat &&
-                    window.currentTurnActiveCat !== cat.key &&
+                    g.turnActiveCat &&
+                    g.turnActiveCat !== cat.key &&
                     !isFilled;
+
                   const lockedClass =
                     (!isTurn && !finished) || isLockedThisTurn
                       ? "locked-col"
@@ -1818,10 +1848,11 @@
                   }
 
                   return `<td class="${lockedClass}">
-              <input type="number" class="cell-input ${filledClass}" ${disabled} ${constraints}
+              <input type="number" id="gen-${e.id}-${cat.key}" class="cell-input ${filledClass}" ${disabled} ${constraints}
                 data-entity="${e.id}" data-cat="${cat.key}"
                 value="${isFilled ? val : ""}" 
                 placeholder="${cat.hint || "ej: " + cat.n * 3}"
+                oninput="handleGeneralaInputVisuals(this)"
                 onchange="updateGeneralaPointCell(this)" />
             </td>`;
                 })
@@ -1903,23 +1934,27 @@
 
         const g = state.room.generala;
 
-        // Si previamente habían completado una categoría distinta en este turno, se limpia
-        if (
-          window.currentTurnActiveCat &&
-          window.currentTurnActiveCat !== cat
-        ) {
-          g.scores[entity][window.currentTurnActiveCat] = null;
-        }
+        // Solo aplicamos la lógica de "deshacer y bloquear" si editamos al jugador actual
+        if (g.entities[g.turn].id === entity) {
+          // Si el jugador ya había anotado en otro lado EN ESTE TURNO, le borramos el anterior automáticamente
+          if (g.turnActiveCat && g.turnActiveCat !== cat) {
+            g.scores[entity][g.turnActiveCat] = null;
+          }
 
-        if (raw === "" || isNaN(val)) {
-          g.scores[entity][cat] = null;
-          if (window.currentTurnActiveCat === cat) {
-            window.currentTurnActiveCat = null;
+          if (raw === "" || isNaN(val)) {
+            g.scores[entity][cat] = null;
+            if (g.turnActiveCat === cat) g.turnActiveCat = null;
+          } else {
+            g.scores[entity][cat] = snapToValidGenerala(val, cat);
+            g.turnActiveCat = cat;
           }
         } else {
-          // Ajusta el puntaje al numero valido más cercano
-          g.scores[entity][cat] = snapToValidGenerala(val, cat);
-          window.currentTurnActiveCat = cat;
+          // Si están editando a alguien fuera de turno (para corregir un error viejo)
+          if (raw === "" || isNaN(val)) {
+            g.scores[entity][cat] = null;
+          } else {
+            g.scores[entity][cat] = snapToValidGenerala(val, cat);
+          }
         }
 
         await saveRoom();
@@ -1951,6 +1986,7 @@
         });
         g.startIndex = (g.startIndex + 1) % g.entities.length;
         g.turn = g.startIndex;
+        g.turnActiveCat = null;
         window.currentTurnActiveCat = null;
         state.room.status = "playing";
         await saveRoom();
@@ -1959,6 +1995,15 @@
 
       /* ---------- Render dispatcher ---------- */
       function render() {
+        // Guardamos el input que la persona estaba tocando (si existe) para no sacarle el foco
+        let activeInputId = null;
+        if (
+          document.activeElement &&
+          document.activeElement.tagName === "INPUT"
+        ) {
+          activeInputId = document.activeElement.id;
+        }
+
         const scrollEl = document.querySelector(".table-scroll");
         const savedTableScroll = scrollEl ? scrollEl.scrollLeft : 0;
         const savedWindowScroll =
@@ -2004,6 +2049,12 @@
           newScrollEl.scrollLeft = savedTableScroll;
         }
         window.scrollTo(0, savedWindowScroll);
+
+        // Restauramos el foco instantáneamente sin interrumpir el tipeo
+        if (activeInputId) {
+          const el = document.getElementById(activeInputId);
+          if (el) el.focus();
+        }
       }
 
       /* ---------- Inicio ---------- */
