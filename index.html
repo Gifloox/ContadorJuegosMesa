@@ -584,8 +584,10 @@
         min-width: 130px;
       }
 
+      /* Clase para bloquear visualmente los casilleros en la Generala */
       table td.locked-col {
         background: rgba(0, 0, 0, 0.04);
+        opacity: 0.5;
       }
       table th.locked-col {
         opacity: 0.5;
@@ -593,7 +595,7 @@
       table td.locked-col input {
         background: transparent;
         border-color: transparent;
-        opacity: 0.6;
+        color: rgba(0, 0, 0, 0.5);
       }
 
       .muted {
@@ -677,6 +679,9 @@
         screen: "home",
         pollTimer: null,
       };
+
+      // Controla cuál fue el único casillero modificado en este turno (Generala)
+      window.currentTurnActiveCat = null;
 
       const app = document.getElementById("app");
 
@@ -771,6 +776,7 @@
       function goHome() {
         stopPolling();
         state = { code: null, room: null, screen: "home", pollTimer: null };
+        window.currentTurnActiveCat = null;
         syncUrl();
         render();
       }
@@ -805,16 +811,16 @@
 
       /* ---------- Fósforos para Truco ---------- */
       function getMatchBoxSvg(count) {
-        const activeColor = "#d6985c"; // madera fosforo
-        const headColor = "#d93829"; // cabeza roja
+        const activeColor = "#d6985c";
+        const headColor = "#d93829";
         const idleColor = "rgba(0,0,0,0.06)";
 
         const lines = [
-          { x1: 12, y1: 10, x2: 12, y2: 40, hx: 12, hy: 10 }, // Izq
-          { x1: 12, y1: 40, x2: 40, y2: 40, hx: 40, hy: 40 }, // Abajo
-          { x1: 40, y1: 40, x2: 40, y2: 10, hx: 40, hy: 10 }, // Der
-          { x1: 40, y1: 10, x2: 12, y2: 10, hx: 15, hy: 10 }, // Arriba
-          { x1: 12, y1: 10, x2: 40, y2: 40, hx: 37, hy: 37 }, // Diagonal
+          { x1: 12, y1: 10, x2: 12, y2: 40, hx: 12, hy: 10 },
+          { x1: 12, y1: 40, x2: 40, y2: 40, hx: 40, hy: 40 },
+          { x1: 40, y1: 40, x2: 40, y2: 10, hx: 40, hy: 10 },
+          { x1: 40, y1: 10, x2: 12, y2: 10, hx: 15, hy: 10 },
+          { x1: 12, y1: 10, x2: 40, y2: 40, hx: 37, hy: 37 },
         ];
 
         let svg = `<svg width="52" height="52" viewBox="0 0 52 52">`;
@@ -934,6 +940,7 @@
 
       async function chooseGame(game) {
         state.room.game = game;
+        window.currentTurnActiveCat = null;
         if (game === "burako") {
           state.room.burako = {
             mode: null,
@@ -1698,6 +1705,7 @@
         });
         g.startIndex = 0;
         g.turn = g.startIndex;
+        window.currentTurnActiveCat = null;
         state.room.status = "playing";
         await saveRoom();
         state.screen = "generala-play";
@@ -1717,6 +1725,7 @@
         const g = state.room.generala;
         const len = g.entities.length;
         g.turn = (g.turn + delta + len) % len;
+        window.currentTurnActiveCat = null;
         await saveRoom();
         render();
       };
@@ -1737,10 +1746,12 @@
         }
         const g = state.room.generala;
         g.turn = (g.turn + 1) % g.entities.length;
+        window.currentTurnActiveCat = null;
         await saveRoom();
         render();
       };
 
+      // Función que fuerza a que el número ingresado sea válido para esa categoría
       function snapToValidGenerala(val, cat) {
         if (val < 0) val = 0;
         let valid = [];
@@ -1777,11 +1788,23 @@
                   const val = g.scores[e.id][cat.key];
                   const isTurn = i === g.turn;
                   const disabled = !isTurn || finished ? "disabled" : "";
-                  const lockedClass = !isTurn && !finished ? "locked-col" : "";
                   const isFilled = val !== null && val !== undefined;
+
+                  // Bloquea visualmente los campos vacíos de esta ronda si ya se anotó otro campo
+                  const isLockedThisTurn =
+                    isTurn &&
+                    window.currentTurnActiveCat &&
+                    window.currentTurnActiveCat !== cat.key &&
+                    !isFilled;
+                  const lockedClass =
+                    (!isTurn && !finished) || isLockedThisTurn
+                      ? "locked-col"
+                      : "";
+
                   const filledClass = isFilled ? "filled" : "";
 
-                  let constraints = 'min="0"';
+                  let constraints =
+                    'min="0" inputmode="numeric" pattern="[0-9]*"';
                   if (cat.n) {
                     constraints += ` max="${cat.n * 5}" step="${cat.n}"`;
                   } else {
@@ -1880,11 +1903,23 @@
 
         const g = state.room.generala;
 
+        // Si previamente habían completado una categoría distinta en este turno, se limpia
+        if (
+          window.currentTurnActiveCat &&
+          window.currentTurnActiveCat !== cat
+        ) {
+          g.scores[entity][window.currentTurnActiveCat] = null;
+        }
+
         if (raw === "" || isNaN(val)) {
           g.scores[entity][cat] = null;
+          if (window.currentTurnActiveCat === cat) {
+            window.currentTurnActiveCat = null;
+          }
         } else {
           // Ajusta el puntaje al numero valido más cercano
           g.scores[entity][cat] = snapToValidGenerala(val, cat);
+          window.currentTurnActiveCat = cat;
         }
 
         await saveRoom();
@@ -1916,6 +1951,7 @@
         });
         g.startIndex = (g.startIndex + 1) % g.entities.length;
         g.turn = g.startIndex;
+        window.currentTurnActiveCat = null;
         state.room.status = "playing";
         await saveRoom();
         render();
