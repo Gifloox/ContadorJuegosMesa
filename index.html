@@ -689,11 +689,11 @@
         { key: "seis", label: "6 · Seises", n: 6 },
       ];
       const POINT_CATS = [
-        { key: "escalera", label: "Escalera", hint: "ej: 20" },
-        { key: "full", label: "Full", hint: "ej: 30" },
-        { key: "poker", label: "Póker", hint: "ej: 40" },
-        { key: "generala", label: "Generala", hint: "ej: 50" },
-        { key: "generalaDoble", label: "Generala Doble", hint: "ej: 100" },
+        { key: "escalera", label: "Escalera", hint: "20/25" },
+        { key: "full", label: "Full", hint: "30/35" },
+        { key: "poker", label: "Póker", hint: "40/45" },
+        { key: "generala", label: "Generala", hint: "50/55" },
+        { key: "generalaDoble", label: "Gen. Doble", hint: "100/105" },
       ];
 
       /* ---------- Configuración de Firebase ---------- */
@@ -1741,6 +1741,27 @@
         render();
       };
 
+      function snapToValidGenerala(val, cat) {
+        if (val < 0) val = 0;
+        let valid = [];
+        if (cat === "uno") valid = [0, 1, 2, 3, 4, 5];
+        else if (cat === "dos") valid = [0, 2, 4, 6, 8, 10];
+        else if (cat === "tres") valid = [0, 3, 6, 9, 12, 15];
+        else if (cat === "cuatro") valid = [0, 4, 8, 12, 16, 20];
+        else if (cat === "cinco") valid = [0, 5, 10, 15, 20, 25];
+        else if (cat === "seis") valid = [0, 6, 12, 18, 24, 30];
+        else if (cat === "escalera") valid = [0, 20, 25];
+        else if (cat === "full") valid = [0, 30, 35];
+        else if (cat === "poker") valid = [0, 40, 45];
+        else if (cat === "generala") valid = [0, 50, 55];
+        else if (cat === "generalaDoble") valid = [0, 100, 105];
+
+        // Encuentra el numero valido más cercano al ingresado por el usuario
+        return valid.reduce((prev, curr) =>
+          Math.abs(curr - val) < Math.abs(prev - val) ? curr : prev,
+        );
+      }
+
       function renderGeneralaPlay() {
         app.classList.add("wide-mode");
         const g = state.room.generala;
@@ -1760,8 +1781,21 @@
                   const isFilled = val !== null && val !== undefined;
                   const filledClass = isFilled ? "filled" : "";
 
+                  let constraints = 'min="0"';
+                  if (cat.n) {
+                    constraints += ` max="${cat.n * 5}" step="${cat.n}"`;
+                  } else {
+                    let max = 0;
+                    if (cat.key === "escalera") max = 25;
+                    if (cat.key === "full") max = 35;
+                    if (cat.key === "poker") max = 45;
+                    if (cat.key === "generala") max = 55;
+                    if (cat.key === "generalaDoble") max = 105;
+                    constraints += ` max="${max}" step="5"`;
+                  }
+
                   return `<td class="${lockedClass}">
-              <input type="number" class="cell-input ${filledClass}" ${disabled}
+              <input type="number" class="cell-input ${filledClass}" ${disabled} ${constraints}
                 data-entity="${e.id}" data-cat="${cat.key}"
                 value="${isFilled ? val : ""}" 
                 placeholder="${cat.hint || "ej: " + cat.n * 3}"
@@ -1843,8 +1877,16 @@
           cat = input.dataset.cat;
         const raw = input.value;
         const val = parseInt(raw);
-        state.room.generala.scores[entity][cat] =
-          raw === "" || isNaN(val) ? null : val;
+
+        const g = state.room.generala;
+
+        if (raw === "" || isNaN(val)) {
+          g.scores[entity][cat] = null;
+        } else {
+          // Ajusta el puntaje al numero valido más cercano
+          g.scores[entity][cat] = snapToValidGenerala(val, cat);
+        }
+
         await saveRoom();
         render();
       }
